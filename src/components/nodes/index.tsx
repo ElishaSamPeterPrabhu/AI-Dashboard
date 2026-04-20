@@ -1,0 +1,370 @@
+import React from "react";
+import { Handle, Position, NodeResizer, type NodeProps } from "@xyflow/react";
+
+// ─── Node width — set on the RF node object so the wrapper matches ───
+export const NODE_W = 160;
+
+/** Map used by CanvasPage to stamp width (and height for resizable) onto every new node */
+export const NODE_DIMENSIONS: Record<string, { width: number; height?: number }> = {
+  sticky:     { width: NODE_W },
+  process:    { width: NODE_W },
+  input:      { width: NODE_W },
+  calculator: { width: NODE_W },
+  output:     { width: NODE_W },
+  ai:         { width: NODE_W },
+  chart:      { width: NODE_W },
+  decision:   { width: 110, height: 110 },
+  database:   { width: NODE_W },
+  trigger:    { width: NODE_W },
+  group:      { width: 300, height: 200 },
+  assumption: { width: NODE_W },
+  loop:       { width: 350, height: 250 },
+};
+
+/** No visual selection ring — selection is handled purely by the config panel opening */
+function ring(_selected: boolean): React.CSSProperties {
+  return {};
+}
+
+// ─── Sticky / Note ───────────────────────────────────────────────
+const STICKY_COLORS: Record<string, { bg: string; border: string }> = {
+  yellow: { bg: "#fef9c3", border: "#fde047" },
+  blue:   { bg: "#dbeafe", border: "#93c5fd" },
+  pink:   { bg: "#fce7f3", border: "#f9a8d4" },
+  green:  { bg: "#dcfce7", border: "#86efac" },
+  purple: { bg: "#ede9fe", border: "#c4b5fd" },
+};
+
+export function StickyNode({ data, selected }: NodeProps) {
+  const d = data as { text?: string; color?: string };
+  const c = STICKY_COLORS[d.color ?? "yellow"] ?? STICKY_COLORS.yellow;
+  return (
+    <div
+      style={{
+        width: "100%",
+        minHeight: 56,
+        background: c.bg,
+        border: `1.5px solid ${c.border}`,
+        borderRadius: 8,
+        padding: "8px 10px",
+        fontSize: 12,
+        color: "#1e293b",
+        lineHeight: 1.45,
+        boxSizing: "border-box",
+        ...ring(!!selected),
+      }}
+    >
+      {d.text || <em style={{ opacity: 0.45 }}>Note…</em>}
+    </div>
+  );
+}
+
+// ─── Process ─────────────────────────────────────────────────────
+export function ProcessNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; description?: string };
+  return (
+    <div className="nf-node" style={{ ...ring(!!selected) }}>
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className="nf-node__icon-row">
+        <span className="nf-node__icon nf-node__icon--neutral">
+          <i className="modus-icons modus-wc-icon--sm" aria-hidden>settings</i>
+        </span>
+        <span className="nf-node__label">{d.label || "Process"}</span>
+      </div>
+      {d.description && <div className="nf-node__sub">{d.description}</div>}
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
+
+// ─── Input ───────────────────────────────────────────────────────
+export function InputNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; value?: string };
+  return (
+    <div className="nf-node nf-node--input" style={{ ...ring(!!selected) }}>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+      <div className="nf-node__icon-row">
+        <span className="nf-node__type-badge nf-node__type-badge--blue">IN</span>
+        <span className="nf-node__label">{d.label || "Input"}</span>
+      </div>
+      {d.value ? (
+        <div className="nf-node__value">{d.value}</div>
+      ) : (
+        <div className="nf-node__placeholder">No value set</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Calculator ──────────────────────────────────────────────────
+export function CalculatorNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; formula?: string };
+  return (
+    <div className="nf-node" style={{ ...ring(!!selected) }}>
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className="nf-node__icon-row">
+        <span className="nf-node__icon nf-node__icon--amber" aria-hidden>
+          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace" }}>fx</span>
+        </span>
+        <span className="nf-node__label">{d.label || "Calculator"}</span>
+      </div>
+      {d.formula && <div className="nf-node__mono">{d.formula}</div>}
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
+
+// ─── Output / Result ─────────────────────────────────────────────
+export function OutputNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; value?: unknown };
+  const val = d.value != null ? String(d.value) : null;
+  return (
+    <div className="nf-node nf-node--output" style={{ ...ring(!!selected) }}>
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className="nf-node__icon-row">
+        <span className="nf-node__type-badge nf-node__type-badge--green">OUT</span>
+        <span className="nf-node__label">{d.label || "Result"}</span>
+      </div>
+      {val ? (
+        <div className="nf-node__value nf-node__value--large">{val}</div>
+      ) : (
+        <div className="nf-node__placeholder">Awaiting value</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Chart ───────────────────────────────────────────────────────
+export function ChartNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; chartType?: string };
+  return (
+    <div className="nf-node" style={{ ...ring(!!selected) }}>
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className="nf-node__icon-row">
+        <span className="nf-node__icon nf-node__icon--neutral">
+          <i className="modus-icons modus-wc-icon--sm" aria-hidden>bar_chart</i>
+        </span>
+        <span className="nf-node__label">{d.label || "Chart"}</span>
+        {d.chartType && (
+          <span className="nf-node__sub" style={{ marginLeft: "auto" }}>{d.chartType}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── AI Node ─────────────────────────────────────────────────────
+const STATUS_COLORS: Record<string, string> = {
+  idle:         "#6b7280",
+  provisioning: "#3b82f6",
+  ready:        "#22c55e",
+  running:      "#6366f1",
+  done:         "#22c55e",
+  error:        "#ef4444",
+};
+
+export function AiNode({ data, selected }: NodeProps) {
+  const d = data as {
+    label?: string;
+    description?: string;
+    agentName?: string;
+    status?: string;
+  };
+  const status = d.status ?? "idle";
+  const dot = STATUS_COLORS[status] ?? STATUS_COLORS.idle;
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div
+        className="ai-ux-gradient-frame"
+        style={{ width: "100%", boxSizing: "border-box", ...ring(!!selected) }}
+      >
+        <div className="ai-ux-gradient-frame__glow" aria-hidden />
+        <div className="ai-ux-gradient-frame__inner nf-ai">
+          <div className="nf-ai__header">
+            <span className="nf-ai__mark" aria-hidden>
+              <i className="modus-icons modus-wc-icon--sm" style={{ color: "#fff", fontSize: 12 }}>ai_stars</i>
+            </span>
+            <span className="nf-node__label" style={{ flex: 1 }}>{d.label || "AI Node"}</span>
+            <span className="nf-ai__dot" style={{ background: dot }} title={status} />
+          </div>
+          <div className="nf-ai__sub">
+            {d.agentName
+              ? <><span className="nf-ai__agent-dot" />{d.agentName}</>
+              : (d.description || "Click to configure")}
+          </div>
+        </div>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
+
+// ─── Decision — diamond ───────────────────────────────────────────
+export function DecisionNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; trueLabel?: string; falseLabel?: string };
+  return (
+    <div className="nf-decision-wrapper" style={{ ...ring(!!selected) }}>
+      {/* Handles at the four diamond tips */}
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <Handle type="source" position={Position.Right} id="true" className="node-handle" />
+      <Handle type="source" position={Position.Bottom} id="default" className="node-handle" />
+      <Handle type="source" position={Position.Left} id="false" className="node-handle" />
+
+      <div className="nf-decision">
+        <div className="nf-decision__content">
+          <span className="nf-decision__label">{d.label || "Decision"}</span>
+          {(d.trueLabel || d.falseLabel) && (
+            <span className="nf-decision__sub">
+              {d.trueLabel || "True"} / {d.falseLabel || "False"}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Database / Store — cylinder ─────────────────────────────────
+export function DatabaseNode({ data, selected }: NodeProps) {
+  const d = data as {
+    label?: string;
+    entries?: { key: string; value: string }[];
+    description?: string;
+  };
+  const entries = d.entries ?? [];
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className="nf-db" style={{ ...ring(!!selected) }}>
+        <div className="nf-db__cap nf-db__cap--top" />
+        <div className="nf-db__body">
+          <div className="nf-node__icon-row">
+            <span className="nf-db__badge">DB</span>
+            <span className="nf-db__label">{d.label || "Data Store"}</span>
+          </div>
+          {entries.length > 0 ? (
+            entries.slice(0, 3).map((e, i) => (
+              <div key={i} className="nf-db__entry">
+                <span style={{ color: "#a78bfa" }}>{e.key}</span>: {e.value || <em style={{ opacity: 0.4 }}>—</em>}
+              </div>
+            ))
+          ) : (
+            <div className="nf-db__placeholder">{d.description || "No data entries"}</div>
+          )}
+          {entries.length > 3 && (
+            <div className="nf-db__placeholder">+{entries.length - 3} more…</div>
+          )}
+        </div>
+        <div className="nf-db__cap nf-db__cap--bottom" />
+      </div>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
+
+// ─── Trigger — pill ───────────────────────────────────────────────
+const TRIGGER_ICONS: Record<string, string> = {
+  manual:    "play_circle",
+  scheduled: "timer",
+  event:     "bolt",
+};
+const TRIGGER_LABELS: Record<string, string> = {
+  manual:    "Manual",
+  scheduled: "Scheduled",
+  event:     "On Event",
+};
+
+export function TriggerNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; triggerType?: string };
+  const type = d.triggerType ?? "manual";
+  const icon = TRIGGER_ICONS[type] ?? TRIGGER_ICONS.manual;
+  const sub = TRIGGER_LABELS[type] ?? "Manual";
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <div className="nf-trigger" style={{ ...ring(!!selected) }}>
+        <span className="nf-trigger__icon">
+          <i className="modus-icons" style={{ fontSize: 12 }}>{icon}</i>
+        </span>
+        <div className="nf-trigger__text">
+          <span className="nf-trigger__label">{d.label || "Trigger"}</span>
+          <span className="nf-trigger__sub">{sub}</span>
+        </div>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
+
+// ─── Group / Frame — resizable container ─────────────────────────
+export function GroupNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string };
+  return (
+    <div className="nf-group">
+      <NodeResizer
+        minWidth={160}
+        minHeight={120}
+        isVisible={!!selected}
+        lineStyle={{ borderColor: "var(--modus-wc-color-primary)" }}
+        handleStyle={{ borderColor: "var(--modus-wc-color-primary)", background: "var(--modus-wc-color-base-page)" }}
+      />
+      <span className="nf-group__label">{d.label || "Frame"}</span>
+    </div>
+  );
+}
+
+// ─── Assumption — distribution input variant ──────────────────────
+export function AssumptionNode({ data, selected }: NodeProps) {
+  const d = data as {
+    label?: string;
+    distribution?: string;
+    min?: number;
+    max?: number;
+    mostLikely?: number;
+  };
+  const dist = d.distribution ?? "triangular";
+  const hasRange = d.min != null && d.max != null;
+
+  return (
+    <div className="nf-node nf-node--assumption" style={{ ...ring(!!selected) }}>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+      <div className="nf-node__icon-row">
+        <span className="nf-node__type-badge nf-node__type-badge--purple">~</span>
+        <span className="nf-node__label">{d.label || "Assumption"}</span>
+      </div>
+      {hasRange ? (
+        <div className="nf-assumption__range">
+          {d.min} → {d.mostLikely != null ? `${d.mostLikely}` : "?"} → {d.max}
+        </div>
+      ) : (
+        <div className="nf-node__placeholder">Set min / max</div>
+      )}
+      <div className="nf-assumption__dist">{dist}</div>
+    </div>
+  );
+}
+
+// ─── Loop — resizable iterator container ─────────────────────────
+export function LoopNode({ data, selected }: NodeProps) {
+  const d = data as { label?: string; maxIterations?: number };
+  return (
+    <div className="nf-loop">
+      <NodeResizer
+        minWidth={200}
+        minHeight={150}
+        isVisible={!!selected}
+        lineStyle={{ borderColor: "#60a5fa" }}
+        handleStyle={{ borderColor: "#60a5fa", background: "var(--modus-wc-color-base-page)" }}
+      />
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className="nf-loop__header">
+        <i className="modus-icons" style={{ fontSize: 12, color: "#60a5fa" }}>refresh</i>
+        <span className="nf-loop__label">{d.label || "Loop"}</span>
+        <span className="nf-loop__badge">× {d.maxIterations ?? 10}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
