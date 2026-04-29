@@ -7,6 +7,7 @@ import {
   ModusWcBadge,
 } from "@trimble-oss/moduswebcomponents-react";
 import { useAppStore } from "@/store/appStore";
+import { badgeColorForProjectId } from "@/utils/projectBadgeColor";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -131,12 +132,15 @@ export default function HomePage() {
                   onClick={() => navigate(`/projects/${project.id}`)}
                 >
                   <div className="flex items-start gap-3 p-4">
-                    <span
-                      className="flex items-center justify-center w-8 h-8 rounded-lg text-white text-sm font-bold flex-shrink-0 mt-0.5"
-                      style={{ background: project.color ?? "#0063a3" }}
+                    <ModusWcBadge
+                      color={badgeColorForProjectId(project.id)}
+                      size="md"
+                      variant="counter"
+                      customClass="flex-shrink-0 mt-0.5"
+                      aria-hidden
                     >
-                      {project.name.charAt(0)}
-                    </span>
+                      {project.name.charAt(0).toUpperCase()}
+                    </ModusWcBadge>
                     <div className="flex flex-col gap-1 min-w-0 flex-1">
                       <ModusWcTypography
                         hierarchy="p"
@@ -153,12 +157,9 @@ export default function HomePage() {
                           customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)] truncate"
                         />
                       )}
-                      <ModusWcBadge
-                        text={`${project.workflows.length} workflow${project.workflows.length !== 1 ? "s" : ""}`}
-                        color="secondary"
-                        size="sm"
-                        customClass="mt-1 w-fit"
-                      />
+                      <ModusWcBadge color="secondary" size="sm" customClass="mt-1 w-fit">
+                        {`${project.workflows.length} workflow${project.workflows.length !== 1 ? "s" : ""}`}
+                      </ModusWcBadge>
                     </div>
                   </div>
                 </ModusWcCard>

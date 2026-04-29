@@ -1,5 +1,6 @@
 import React from "react";
 import { Handle, Position, NodeResizer, type NodeProps } from "@xyflow/react";
+import type { ExecState } from "@/store/canvasStore";
 
 // ─── Node width — set on the RF node object so the wrapper matches ───
 export const NODE_W = 160;
@@ -19,11 +20,47 @@ export const NODE_DIMENSIONS: Record<string, { width: number; height?: number }>
   group:      { width: 300, height: 200 },
   assumption: { width: NODE_W },
   loop:       { width: 350, height: 250 },
+  connector:  { width: NODE_W },
 };
 
 /** No visual selection ring — selection is handled purely by the config panel opening */
 function ring(_selected: boolean): React.CSSProperties {
   return {};
+}
+
+/** CSS class added to the node root based on execution state */
+function execClass(data: Record<string, unknown>) {
+  const s = (data.executionState as ExecState) ?? "idle";
+  return s === "idle" ? "" : `nf-state-${s}`;
+}
+
+/** Small bar rendered ABOVE the node: duration + state dot */
+function StatusBar({ data }: { data: Record<string, unknown> }) {
+  const duration = data.estimatedDuration as number | undefined;
+  const state = (data.executionState as ExecState) ?? "idle";
+
+  const hasMeta = duration != null && duration > 0;
+  const hasState = state !== "idle";
+  if (!hasMeta && !hasState) return null;
+
+  return (
+    <div className="nf-status-bar">
+      {duration != null && duration > 0 && (
+        <span className="nf-duration">⏱{duration}s</span>
+      )}
+      {state === "queued"  && <span className="nf-exec-badge nf-exec-badge--queued">•</span>}
+      {state === "running" && <span className="nf-exec-badge nf-exec-badge--running">▶</span>}
+      {state === "done"    && <span className="nf-exec-badge nf-exec-badge--done">✓</span>}
+    </div>
+  );
+}
+
+/** Result line shown at the bottom of a node once execution finishes */
+function ResultLine({ data }: { data: Record<string, unknown> }) {
+  const state = (data.executionState as ExecState) ?? "idle";
+  const result = data._result as string | undefined;
+  if (state !== "done" || !result) return null;
+  return <div className="nf-result" title={result}>{result}</div>;
 }
 
 // ─── Sticky / Note ───────────────────────────────────────────────
@@ -39,115 +76,138 @@ export function StickyNode({ data, selected }: NodeProps) {
   const d = data as { text?: string; color?: string };
   const c = STICKY_COLORS[d.color ?? "yellow"] ?? STICKY_COLORS.yellow;
   return (
-    <div
-      style={{
-        width: "100%",
-        minHeight: 56,
-        background: c.bg,
-        border: `1.5px solid ${c.border}`,
-        borderRadius: 8,
-        padding: "8px 10px",
-        fontSize: 12,
-        color: "#1e293b",
-        lineHeight: 1.45,
-        boxSizing: "border-box",
-        ...ring(!!selected),
-      }}
-    >
-      {d.text || <em style={{ opacity: 0.45 }}>Note…</em>}
+    <div className={`relative ${execClass(d as Record<string,unknown>)}`}>
+      <StatusBar data={d as Record<string,unknown>} />
+      <div
+        style={{
+          width: "100%",
+          minHeight: 56,
+          background: c.bg,
+          border: `1.5px solid ${c.border}`,
+          borderRadius: 8,
+          padding: "8px 10px",
+          fontSize: 12,
+          color: "#1e293b",
+          lineHeight: 1.45,
+          boxSizing: "border-box",
+          ...ring(!!selected),
+        }}
+      >
+        {d.text || <em style={{ opacity: 0.45 }}>Note…</em>}
+      </div>
     </div>
   );
 }
 
 // ─── Process ─────────────────────────────────────────────────────
 export function ProcessNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; description?: string };
+  const d = data as { label?: string; description?: string } & Record<string,unknown>;
   return (
-    <div className="nf-node" style={{ ...ring(!!selected) }}>
-      <Handle type="target" position={Position.Top} className="node-handle" />
-      <div className="nf-node__icon-row">
-        <span className="nf-node__icon nf-node__icon--neutral">
-          <i className="modus-icons modus-wc-icon--sm" aria-hidden>settings</i>
-        </span>
-        <span className="nf-node__label">{d.label || "Process"}</span>
+    <div className={`relative ${execClass(d)}`}>
+      <StatusBar data={d} />
+      <div className="nf-node" style={{ ...ring(!!selected) }}>
+        <Handle type="target" position={Position.Top} className="node-handle" />
+        <div className="nf-node__icon-row">
+          <span className="nf-node__icon nf-node__icon--neutral">
+            <i className="modus-icons modus-wc-icon--sm" aria-hidden>settings</i>
+          </span>
+          <span className="nf-node__label">{d.label || "Process"}</span>
+        </div>
+        {d.description && <div className="nf-node__sub">{d.description}</div>}
+        <ResultLine data={d} />
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
       </div>
-      {d.description && <div className="nf-node__sub">{d.description}</div>}
-      <Handle type="source" position={Position.Bottom} className="node-handle" />
     </div>
   );
 }
 
 // ─── Input ───────────────────────────────────────────────────────
 export function InputNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; value?: string };
+  const d = data as { label?: string; value?: string } & Record<string,unknown>;
   return (
-    <div className="nf-node nf-node--input" style={{ ...ring(!!selected) }}>
-      <Handle type="source" position={Position.Bottom} className="node-handle" />
-      <div className="nf-node__icon-row">
-        <span className="nf-node__type-badge nf-node__type-badge--blue">IN</span>
-        <span className="nf-node__label">{d.label || "Input"}</span>
+    <div className={`relative ${execClass(d)}`}>
+      <StatusBar data={d} />
+      <div className="nf-node nf-node--input" style={{ ...ring(!!selected) }}>
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
+        <div className="nf-node__icon-row">
+          <span className="nf-node__type-badge nf-node__type-badge--blue">IN</span>
+          <span className="nf-node__label">{d.label || "Input"}</span>
+        </div>
+        {d.value ? (
+          <div className="nf-node__value">{d.value}</div>
+        ) : (
+          <div className="nf-node__placeholder">No value set</div>
+        )}
+        <ResultLine data={d} />
       </div>
-      {d.value ? (
-        <div className="nf-node__value">{d.value}</div>
-      ) : (
-        <div className="nf-node__placeholder">No value set</div>
-      )}
     </div>
   );
 }
 
 // ─── Calculator ──────────────────────────────────────────────────
 export function CalculatorNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; formula?: string };
+  const d = data as { label?: string; formula?: string } & Record<string,unknown>;
   return (
-    <div className="nf-node" style={{ ...ring(!!selected) }}>
-      <Handle type="target" position={Position.Top} className="node-handle" />
-      <div className="nf-node__icon-row">
-        <span className="nf-node__icon nf-node__icon--amber" aria-hidden>
-          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace" }}>fx</span>
-        </span>
-        <span className="nf-node__label">{d.label || "Calculator"}</span>
+    <div className={`relative ${execClass(d)}`}>
+      <StatusBar data={d} />
+      <div className="nf-node" style={{ ...ring(!!selected) }}>
+        <Handle type="target" position={Position.Top} className="node-handle" />
+        <div className="nf-node__icon-row">
+          <span className="nf-node__icon nf-node__icon--amber" aria-hidden>
+            <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace" }}>fx</span>
+          </span>
+          <span className="nf-node__label">{d.label || "Calculator"}</span>
+        </div>
+        {d.formula && <div className="nf-node__mono">{d.formula}</div>}
+        <ResultLine data={d} />
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
       </div>
-      {d.formula && <div className="nf-node__mono">{d.formula}</div>}
-      <Handle type="source" position={Position.Bottom} className="node-handle" />
     </div>
   );
 }
 
 // ─── Output / Result ─────────────────────────────────────────────
 export function OutputNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; value?: unknown };
+  const d = data as { label?: string; value?: unknown } & Record<string,unknown>;
   const val = d.value != null ? String(d.value) : null;
   return (
-    <div className="nf-node nf-node--output" style={{ ...ring(!!selected) }}>
-      <Handle type="target" position={Position.Top} className="node-handle" />
-      <div className="nf-node__icon-row">
-        <span className="nf-node__type-badge nf-node__type-badge--green">OUT</span>
-        <span className="nf-node__label">{d.label || "Result"}</span>
+    <div className={`relative ${execClass(d)}`}>
+      <StatusBar data={d} />
+      <div className="nf-node nf-node--output" style={{ ...ring(!!selected) }}>
+        <Handle type="target" position={Position.Top} className="node-handle" />
+        <div className="nf-node__icon-row">
+          <span className="nf-node__type-badge nf-node__type-badge--green">OUT</span>
+          <span className="nf-node__label">{d.label || "Result"}</span>
+        </div>
+        {val ? (
+          <div className="nf-node__value nf-node__value--large">{val}</div>
+        ) : (
+          <div className="nf-node__placeholder">Awaiting value</div>
+        )}
+        <ResultLine data={d} />
       </div>
-      {val ? (
-        <div className="nf-node__value nf-node__value--large">{val}</div>
-      ) : (
-        <div className="nf-node__placeholder">Awaiting value</div>
-      )}
     </div>
   );
 }
 
 // ─── Chart ───────────────────────────────────────────────────────
 export function ChartNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; chartType?: string };
+  const d = data as { label?: string; chartType?: string } & Record<string,unknown>;
   return (
-    <div className="nf-node" style={{ ...ring(!!selected) }}>
-      <Handle type="target" position={Position.Top} className="node-handle" />
-      <div className="nf-node__icon-row">
-        <span className="nf-node__icon nf-node__icon--neutral">
-          <i className="modus-icons modus-wc-icon--sm" aria-hidden>bar_chart</i>
-        </span>
-        <span className="nf-node__label">{d.label || "Chart"}</span>
-        {d.chartType && (
-          <span className="nf-node__sub" style={{ marginLeft: "auto" }}>{d.chartType}</span>
-        )}
+    <div className={`relative ${execClass(d)}`}>
+      <StatusBar data={d} />
+      <div className="nf-node" style={{ ...ring(!!selected) }}>
+        <Handle type="target" position={Position.Top} className="node-handle" />
+        <div className="nf-node__icon-row">
+          <span className="nf-node__icon nf-node__icon--neutral">
+            <i className="modus-icons modus-wc-icon--sm" aria-hidden>bar_chart</i>
+          </span>
+          <span className="nf-node__label">{d.label || "Chart"}</span>
+          {d.chartType && (
+            <span className="nf-node__sub" style={{ marginLeft: "auto" }}>{d.chartType}</span>
+          )}
+        </div>
+        <ResultLine data={d} />
       </div>
     </div>
   );
@@ -163,18 +223,33 @@ const STATUS_COLORS: Record<string, string> = {
   error:        "#ef4444",
 };
 
-export function AiNode({ data, selected }: NodeProps) {
+export function AiNode({ data, selected, id }: NodeProps) {
   const d = data as {
     label?: string;
     description?: string;
     agentName?: string;
     status?: string;
-  };
+    _toolCalls?: unknown[];
+    _script?: string;
+    _result?: string;
+  } & Record<string,unknown>;
   const status = d.status ?? "idle";
   const dot = STATUS_COLORS[status] ?? STATUS_COLORS.idle;
+  // Show (i) whenever there's any result — tool calls, script, or plain text response
+  const hasScript = Boolean(d._toolCalls?.length || d._script || d._result);
+
+  // Access setScriptModal lazily to avoid circular import issues
+  const handleInfoClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Dynamic import keeps nodes/index.tsx free of a direct store dependency
+    import("@/store/canvasStore").then(({ useCanvasStore }) => {
+      useCanvasStore.getState().setScriptModal(id);
+    });
+  };
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ position: "relative", width: "100%" }} className={execClass(d)}>
+      <StatusBar data={d} />
       <Handle type="target" position={Position.Top} className="node-handle" />
       <div
         className="ai-ux-gradient-frame"
@@ -187,6 +262,16 @@ export function AiNode({ data, selected }: NodeProps) {
               <i className="modus-icons modus-wc-icon--sm" style={{ color: "#fff", fontSize: 12 }}>ai_stars</i>
             </span>
             <span className="nf-node__label" style={{ flex: 1 }}>{d.label || "AI Node"}</span>
+            {hasScript && (
+              <button
+                className="nf-ai__info-btn"
+                onClick={handleInfoClick}
+                title="View scripts & tool calls"
+                aria-label="View scripts"
+              >
+                <i className="modus-icons" style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>info</i>
+              </button>
+            )}
             <span className="nf-ai__dot" style={{ background: dot }} title={status} />
           </div>
           <div className="nf-ai__sub">
@@ -194,6 +279,7 @@ export function AiNode({ data, selected }: NodeProps) {
               ? <><span className="nf-ai__agent-dot" />{d.agentName}</>
               : (d.description || "Click to configure")}
           </div>
+          <ResultLine data={d} />
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="node-handle" />
@@ -203,21 +289,25 @@ export function AiNode({ data, selected }: NodeProps) {
 
 // ─── Decision — diamond ───────────────────────────────────────────
 export function DecisionNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; trueLabel?: string; falseLabel?: string };
+  const d = data as { label?: string; trueLabel?: string; falseLabel?: string } & Record<string,unknown>;
   return (
-    <div className="nf-decision-wrapper" style={{ ...ring(!!selected) }}>
-      {/* Handles at the four diamond tips */}
+    <div className={`nf-decision-wrapper ${execClass(d)}`} style={{ ...ring(!!selected) }}>
+      <StatusBar data={d} />
       <Handle type="target" position={Position.Top} className="node-handle" />
       <Handle type="source" position={Position.Right} id="true" className="node-handle" />
       <Handle type="source" position={Position.Bottom} id="default" className="node-handle" />
       <Handle type="source" position={Position.Left} id="false" className="node-handle" />
-
       <div className="nf-decision">
         <div className="nf-decision__content">
           <span className="nf-decision__label">{d.label || "Decision"}</span>
           {(d.trueLabel || d.falseLabel) && (
             <span className="nf-decision__sub">
               {d.trueLabel || "True"} / {d.falseLabel || "False"}
+            </span>
+          )}
+          {(d.executionState as string) === "done" && d._result && (
+            <span className="nf-decision__sub" style={{ color: "#4ade80", fontSize: 8 }}>
+              {String(d._result)}
             </span>
           )}
         </div>
@@ -232,10 +322,11 @@ export function DatabaseNode({ data, selected }: NodeProps) {
     label?: string;
     entries?: { key: string; value: string }[];
     description?: string;
-  };
+  } & Record<string,unknown>;
   const entries = d.entries ?? [];
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ position: "relative", width: "100%" }} className={execClass(d)}>
+      <StatusBar data={d} />
       <Handle type="target" position={Position.Top} className="node-handle" />
       <div className="nf-db" style={{ ...ring(!!selected) }}>
         <div className="nf-db__cap nf-db__cap--top" />
@@ -256,6 +347,7 @@ export function DatabaseNode({ data, selected }: NodeProps) {
           {entries.length > 3 && (
             <div className="nf-db__placeholder">+{entries.length - 3} more…</div>
           )}
+          <ResultLine data={d} />
         </div>
         <div className="nf-db__cap nf-db__cap--bottom" />
       </div>
@@ -277,13 +369,14 @@ const TRIGGER_LABELS: Record<string, string> = {
 };
 
 export function TriggerNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; triggerType?: string };
+  const d = data as { label?: string; triggerType?: string } & Record<string,unknown>;
   const type = d.triggerType ?? "manual";
   const icon = TRIGGER_ICONS[type] ?? TRIGGER_ICONS.manual;
   const sub = TRIGGER_LABELS[type] ?? "Manual";
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ position: "relative", width: "100%" }} className={execClass(d)}>
+      <StatusBar data={d} />
       <div className="nf-trigger" style={{ ...ring(!!selected) }}>
         <span className="nf-trigger__icon">
           <i className="modus-icons" style={{ fontSize: 12 }}>{icon}</i>
@@ -293,6 +386,7 @@ export function TriggerNode({ data, selected }: NodeProps) {
           <span className="nf-trigger__sub">{sub}</span>
         </div>
       </div>
+      <ResultLine data={d} />
       <Handle type="source" position={Position.Bottom} className="node-handle" />
     </div>
   );
@@ -323,25 +417,29 @@ export function AssumptionNode({ data, selected }: NodeProps) {
     min?: number;
     max?: number;
     mostLikely?: number;
-  };
+  } & Record<string,unknown>;
   const dist = d.distribution ?? "triangular";
   const hasRange = d.min != null && d.max != null;
 
   return (
-    <div className="nf-node nf-node--assumption" style={{ ...ring(!!selected) }}>
-      <Handle type="source" position={Position.Bottom} className="node-handle" />
-      <div className="nf-node__icon-row">
-        <span className="nf-node__type-badge nf-node__type-badge--purple">~</span>
-        <span className="nf-node__label">{d.label || "Assumption"}</span>
-      </div>
-      {hasRange ? (
-        <div className="nf-assumption__range">
-          {d.min} → {d.mostLikely != null ? `${d.mostLikely}` : "?"} → {d.max}
+    <div className={`relative ${execClass(d)}`}>
+      <StatusBar data={d} />
+      <div className="nf-node nf-node--assumption" style={{ ...ring(!!selected) }}>
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
+        <div className="nf-node__icon-row">
+          <span className="nf-node__type-badge nf-node__type-badge--purple">~</span>
+          <span className="nf-node__label">{d.label || "Assumption"}</span>
         </div>
-      ) : (
-        <div className="nf-node__placeholder">Set min / max</div>
-      )}
-      <div className="nf-assumption__dist">{dist}</div>
+        {hasRange ? (
+          <div className="nf-assumption__range">
+            {d.min} → {d.mostLikely != null ? `${d.mostLikely}` : "?"} → {d.max}
+          </div>
+        ) : (
+          <div className="nf-node__placeholder">Set min / max</div>
+        )}
+        <div className="nf-assumption__dist">{dist}</div>
+        <ResultLine data={d} />
+      </div>
     </div>
   );
 }
@@ -363,6 +461,46 @@ export function LoopNode({ data, selected }: NodeProps) {
         <i className="modus-icons" style={{ fontSize: 12, color: "#60a5fa" }}>refresh</i>
         <span className="nf-loop__label">{d.label || "Loop"}</span>
         <span className="nf-loop__badge">× {d.maxIterations ?? 10}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
+    </div>
+  );
+}
+
+// ─── Connector — cross-workflow section bridge ───────────────────────────
+export function ConnectorNode({ data, selected }: NodeProps) {
+  const d = data as {
+    label?: string;
+    description?: string;
+    agentId?: string;
+    sectionName?: string;
+  } & Record<string, unknown>;
+  const hasAi = Boolean((d.agentId as string)?.trim());
+
+  return (
+    <div style={{ position: "relative", width: "100%" }} className={execClass(d)}>
+      <StatusBar data={d} />
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <div className={`nf-connector ${hasAi ? "nf-connector--ai" : ""}`} style={{ ...ring(!!selected) }}>
+        <div className="nf-connector__header">
+          <span className="nf-connector__icon">
+            <i className="modus-icons" style={{ fontSize: 13 }}>
+              {hasAi ? "ai_stars" : "arrow_forward"}
+            </i>
+          </span>
+          <span className="nf-connector__label">{d.label || "Connector"}</span>
+          {hasAi && <span className="nf-connector__ai-badge">AI</span>}
+        </div>
+        {d.sectionName && (
+          <div className="nf-connector__target">
+            <i className="modus-icons" style={{ fontSize: 10, opacity: 0.6 }}>arrow_forward</i>
+            <span className="nf-connector__target-name">{d.sectionName as string}</span>
+          </div>
+        )}
+        {d.description && (
+          <div className="nf-connector__desc">{d.description as string}</div>
+        )}
+        <ResultLine data={d} />
       </div>
       <Handle type="source" position={Position.Bottom} className="node-handle" />
     </div>

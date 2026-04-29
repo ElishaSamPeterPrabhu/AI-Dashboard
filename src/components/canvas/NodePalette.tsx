@@ -16,7 +16,7 @@ const GROUPS: { title: string; items: PaletteItem[] }[] = [
   {
     title: "Canvas",
     items: [
-      { type: "sticky", label: "Sticky", icon: "sticky_note_2", description: "Free-form note" },
+      { type: "sticky", label: "Sticky", icon: "comment", description: "Free-form note" },
       { type: "group",  label: "Frame",  icon: "crop_square",   description: "Container / group nodes" },
     ],
   },
@@ -49,7 +49,7 @@ const GROUPS: { title: string; items: PaletteItem[] }[] = [
   {
     title: "Input",
     items: [
-      { type: "input",      label: "Input",      icon: "input",      description: "Typed value (run context)" },
+      { type: "input",      label: "Input",      icon: "text_input", description: "Typed value (run context)" },
       {
         type: "assumption", label: "Assumption", icon: "tune",
         description: "Probability distribution for simulation", accent: "#a855f722",
@@ -79,7 +79,16 @@ const GROUPS: { title: string; items: PaletteItem[] }[] = [
     title: "Output",
     items: [
       { type: "output", label: "Result", icon: "check_circle", description: "Displays a result value" },
-      { type: "chart",  label: "Chart",  icon: "bar_chart",    description: "Inline chart" },
+      { type: "chart",  label: "Chart",  icon: "bar_graph",    description: "Inline chart" },
+    ],
+  },
+  {
+    title: "Connect",
+    items: [
+      {
+        type: "connector", label: "Connector", icon: "arrow_forward",
+        description: "Pass data to another section", accent: "#0891b222",
+      },
     ],
   },
 ];

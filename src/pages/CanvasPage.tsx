@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   ReactFlow,
@@ -7,6 +7,7 @@ import {
   Controls,
   MiniMap,
   type Node,
+  type Edge,
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -18,10 +19,15 @@ import {
   ModusWcTooltip,
 } from "@trimble-oss/moduswebcomponents-react";
 
+import { TEST_WORKFLOW } from "@/data/testWorkflow";
+import { TEST_WORKFLOW_WF2 } from "@/data/testWorkflowWf2";
+import { badgeColorForProjectId } from "@/utils/projectBadgeColor";
+import { apiGet, apiPatch, apiDelete } from "@/api/http";
 import { useCanvasStore } from "@/store/canvasStore";
 import { useAppStore } from "@/store/appStore";
 import NodePalette from "@/components/canvas/NodePalette";
 import NodeConfigPanel from "@/components/canvas/NodeConfigPanel";
+import ScriptModal from "@/components/canvas/ScriptModal";
 import {
   StickyNode,
   ProcessNode,
@@ -36,6 +42,7 @@ import {
   GroupNode,
   AssumptionNode,
   LoopNode,
+  ConnectorNode,
   NODE_DIMENSIONS,
 } from "@/components/nodes";
 
@@ -53,6 +60,7 @@ const NODE_TYPES = {
   group: GroupNode,
   assumption: AssumptionNode,
   loop: LoopNode,
+  connector: ConnectorNode,
 };
 
 const DEFAULT_NODE_DATA: Record<string, Record<string, unknown>> = {
@@ -61,7 +69,7 @@ const DEFAULT_NODE_DATA: Record<string, Record<string, unknown>> = {
   input:      { label: "Input", description: "", dataType: "number", value: "" },
   calculator: { label: "Calculator", formula: "" },
   output:     { label: "Result", format: "text" },
-  ai:         { label: "AI Node", description: "", status: "idle" },
+  ai:         { label: "AI Node", description: "", status: "idle", agentId: "", agentName: "" },
   chart:      { label: "Chart", chartType: "bar" },
   decision:   { label: "Decision", trueLabel: "Yes", falseLabel: "No" },
   database:   { label: "Data Store", entries: [], description: "" },
@@ -69,6 +77,7 @@ const DEFAULT_NODE_DATA: Record<string, Record<string, unknown>> = {
   group:      { label: "Frame" },
   assumption: { label: "Assumption", distribution: "triangular", min: 0, max: 100, mostLikely: 50 },
   loop:       { label: "Loop", maxIterations: 10 },
+  connector:  { label: "Connector", description: "", sectionName: "", agentId: "" },
 };
 
 let nodeCounter = 1;
@@ -79,14 +88,21 @@ function uid(type: string) {
 export default function CanvasPage() {
   const { projectId, workflowId } = useParams<{ projectId: string; workflowId: string }>();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
 
   const { projects } = useAppStore();
   const {
-    nodes, edges, mode, selectedNodeId,
+    nodes, edges, mode, selectedNodeId, isExecuting, executionProgress,
     onNodesChange, onEdgesChange, onConnect,
-    addNode, setMode, setSelectedNodeId,
+    addNode, setMode, setSelectedNodeId, setNodes, setEdges,
+    runWorkflow, resetExecution, stopWorkflow, setWorkflowContext,
   } = useCanvasStore();
+
+  useEffect(() => {
+    setWorkflowContext(workflowId ?? null);
+    return () => setWorkflowContext(null);
+  }, [workflowId, setWorkflowContext]);
 
   const project = projects.find((p) => p.id === projectId);
   const workflow = project?.workflows.find((w) => w.id === workflowId);
@@ -133,28 +149,95 @@ export default function CanvasPage() {
 
   const onPaneClick = useCallback(() => setSelectedNodeId(null), [setSelectedNodeId]);
 
+  // Delete selected node via keyboard when config panel has focus
+  const onCanvasKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if ((e.key === "Delete" || e.key === "Backspace") && selectedNodeId) {
+      // Don't delete if focus is inside a text input / textarea
+      const tag = (e.target as HTMLElement).tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || (e.target as HTMLElement).isContentEditable) return;
+      setNodes(nodes.filter((n) => n.id !== selectedNodeId));
+      setEdges(edges.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
+      setSelectedNodeId(null);
+    }
+  }, [selectedNodeId, nodes, edges, setNodes, setEdges, setSelectedNodeId]);
+
   const isEmpty = nodes.length === 0;
 
-  const SUGGESTIONS = [
-    { type: "ai",      label: "AI Estimator",    offsetX: 340, offsetY: 160 },
-    { type: "input",   label: "Input Value",      offsetX: 160, offsetY: 280 },
-    { type: "process", label: "Process Step",     offsetX: 520, offsetY: 280 },
-  ];
-
-  const handleSuggestionClick = (type: string, label: string, offsetX: number, offsetY: number) => {
-    if (!rfInstance) return;
-    const position = rfInstance.screenToFlowPosition({ x: offsetX, y: offsetY });
-    const dims = NODE_DIMENSIONS[type] ?? { width: 160 };
-    const newNode: Node = {
-      id: uid(type),
-      type,
-      position,
-      width: dims.width,
-      ...(dims.height ? { height: dims.height } : {}),
-      data: { ...(DEFAULT_NODE_DATA[type] ?? {}), label },
-    };
-    addNode(newNode);
+  // ── Load the test workflow ──────────────────────────────
+  const loadTestWorkflow = () => {
+    resetExecution();
+    const wf = workflowId === "wf2" ? TEST_WORKFLOW_WF2 : TEST_WORKFLOW;
+    setNodes(wf.nodes as unknown as Node[]);
+    setEdges(wf.edges.map((e) => ({ ...e, animated: false })));
   };
+
+  // Load persisted canvas from API when opening a workflow
+  useEffect(() => {
+    if (!workflowId) return;
+    setCanvasReady(false);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await apiGet<{ nodes: Node[]; edges: Edge[] }>(
+          `/api/workflows/${workflowId}/canvas`
+        );
+        if (cancelled) return;
+        if (data.nodes?.length) {
+          resetExecution();
+          setNodes(data.nodes);
+          setEdges((data.edges ?? []).map((e) => ({ ...e, animated: false })));
+        }
+
+        // Check for pending input from a Connector node in another workflow
+        try {
+          const pending = await apiGet<{
+            context: Record<string, unknown>;
+            sourceWorkflowId?: string;
+            sourceNodeLabel?: string;
+          } | null>(`/api/workflows/${workflowId}/pending-input`);
+
+          if (pending?.context && !cancelled) {
+            // Pre-populate Input nodes whose `description` matches a context key
+            const ctx = pending.context;
+            const currentNodes = useCanvasStore.getState().nodes;
+            const seededNodes = currentNodes.map((n) => {
+              if (n.type !== "input") return n;
+              const key = (n.data.description as string)?.trim();
+              if (!key || !(key in ctx)) return n;
+              return { ...n, data: { ...n.data, value: String(ctx[key]) } };
+            });
+            setNodes(seededNodes);
+            // Clear pending input so it doesn't re-apply on next load
+            void apiDelete(`/api/workflows/${workflowId}/pending-input`).catch(() => {});
+          }
+        } catch {
+          /* pending input endpoint unavailable */
+        }
+      } catch {
+        /* API offline */
+      } finally {
+        if (!cancelled) setCanvasReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workflowId, setNodes, setEdges, resetExecution]);
+
+  // Debounced save (skip until initial hydration finished)
+  useEffect(() => {
+    if (!workflowId || !canvasReady) return;
+    const t = window.setTimeout(() => {
+      // Strip ephemeral execution state before persisting — only save config data
+      const nodesToSave = nodes.map((n) => {
+        const { _result, _resultRaw, _toolCalls, _script, executionState, status, ...data } = n.data as Record<string, unknown>;
+        void _result; void _resultRaw; void _toolCalls; void _script; void executionState; void status;
+        return { ...n, data };
+      });
+      void apiPatch(`/api/workflows/${workflowId}/canvas`, { nodes: nodesToSave, edges }).catch(() => {});
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [workflowId, nodes, edges]);
 
   return (
     <div className="flex h-full overflow-hidden bg-[var(--modus-wc-color-base-page)]">
@@ -179,12 +262,16 @@ export default function CanvasPage() {
               label={workflow?.name ?? "Workflow"}
               customClass="m-0 text-[var(--modus-wc-color-base-content)] truncate"
             />
-            <ModusWcBadge
-              text={project?.name ?? ""}
-              color="secondary"
-              size="sm"
-              customClass="flex-shrink-0"
-            />
+            {project && (
+              <ModusWcBadge
+                color={badgeColorForProjectId(project.id)}
+                size="sm"
+                customClass="flex-shrink-0 max-w-[140px] nf-canvas-project-badge"
+                title={project.name}
+              >
+                {project.name.length > 22 ? `${project.name.slice(0, 22)}…` : project.name}
+              </ModusWcBadge>
+            )}
           </div>
 
           {/* Centre: Plan / Execute toggle (absolutely centred) */}
@@ -214,16 +301,24 @@ export default function CanvasPage() {
             </ModusWcTooltip>
           </div>
 
-          {/* Right slot: status badge */}
+          {/* Right slot: empty canvas helper + execute badge */}
           <div className="flex items-center gap-2 flex-1 justify-end">
+            {isEmpty && (
+              <ModusWcButton variant="outlined" color="secondary" size="sm" onButtonClick={loadTestWorkflow}>
+                <ModusWcIcon slot="start" name="schema" size="sm" decorative />
+                Load test workflow
+              </ModusWcButton>
+            )}
             {mode === "execute" && (
-              <ModusWcBadge text="Simulation ready" color="success" size="sm" />
+              <ModusWcBadge color="success" size="sm">
+                Simulation ready
+              </ModusWcBadge>
             )}
           </div>
         </div>
 
         {/* React Flow canvas (position:relative so panel overlays work) */}
-        <div ref={reactFlowWrapper} className="flex-1 relative overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>
+        <div ref={reactFlowWrapper} className="flex-1 relative overflow-hidden" onDragOver={onDragOver} onDrop={onDrop} onKeyDown={onCanvasKeyDown} tabIndex={-1}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -235,9 +330,8 @@ export default function CanvasPage() {
             onPaneClick={onPaneClick}
             onInit={setRfInstance}
             fitView
-            deleteKeyCode="Delete"
+            deleteKeyCode={["Delete", "Backspace"]}
             proOptions={{ hideAttribution: true }}
-            nodesFocusable={false}
             colorMode="dark"
           >
             <Background
@@ -249,44 +343,6 @@ export default function CanvasPage() {
             <Controls />
             {nodes.length > 8 && <MiniMap nodeStrokeWidth={3} pannable zoomable />}
           </ReactFlow>
-
-          {/* ── Empty state CTA ──────────────────────────── */}
-          {isEmpty && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="pointer-events-auto w-[360px]">
-                <div className="ai-ux-gradient-frame">
-                  <div className="ai-ux-gradient-frame__glow" aria-hidden />
-                  <div className="ai-ux-gradient-frame__inner px-4 py-4 flex flex-col gap-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="ai-ux-agent-mark-static flex-shrink-0" aria-hidden>
-                        <ModusWcIcon name="ai_stars" size="md" decorative customClass="text-white" />
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        <ModusWcTypography hierarchy="p" size="sm" weight="semibold" label="Start your workflow" customClass="m-0 text-[var(--modus-wc-color-base-content)]" />
-                        <ModusWcTypography hierarchy="p" size="xs" label="Drag nodes from the left, or pick a suggestion." customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)]" />
-                      </div>
-                    </div>
-
-                    <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
-                      {SUGGESTIONS.map(({ type, label, offsetX, offsetY }) => (
-                        <li key={type}>
-                          <ModusWcButton
-                            variant="filled"
-                            color="tertiary"
-                            size="sm"
-                            customClass="w-full !h-auto justify-start"
-                            onButtonClick={() => handleSuggestionClick(type, label, offsetX, offsetY)}
-                          >
-                            <span className="font-normal text-left">{label}</span>
-                          </ModusWcButton>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ── Right config panel: absolute overlay ─────── */}
           <div
@@ -305,21 +361,42 @@ export default function CanvasPage() {
 
         {/* Execute mode bottom bar */}
         {mode === "execute" && (
-          <div className="flex items-center gap-4 px-4 py-2 border-t border-[var(--modus-wc-color-base-300)] bg-[var(--modus-wc-color-base-100)] flex-shrink-0">
-            <ModusWcButton variant="filled" color="primary" size="sm">
+          <div className="flex items-center gap-3 px-4 py-2 border-t border-[var(--modus-wc-color-base-300)] bg-[var(--modus-wc-color-base-100)] flex-shrink-0">
+            <ModusWcButton
+              variant="filled" color="primary" size="sm"
+              disabled={isExecuting}
+              onButtonClick={() => runWorkflow()}
+            >
               <ModusWcIcon slot="start" name="play_arrow" size="sm" decorative />
-              Run
+              {isExecuting ? "Running…" : "Run"}
             </ModusWcButton>
-            <ModusWcButton variant="outlined" color="secondary" size="sm" disabled>
-              <ModusWcIcon slot="start" name="stop" size="sm" decorative />
+            <ModusWcButton
+              variant="filled" color="danger" size="sm"
+              disabled={!isExecuting}
+              onButtonClick={() => stopWorkflow()}
+            >
+              <ModusWcIcon slot="start" name="stop_circle" size="sm" decorative />
               Stop
             </ModusWcButton>
-            <ModusWcTypography hierarchy="p" size="xs" label="Ready to simulate · Press Run to start" customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)]" />
+            <ModusWcButton
+              variant="outlined" color="secondary" size="sm"
+              disabled={isExecuting}
+              onButtonClick={() => resetExecution()}
+            >
+              <ModusWcIcon slot="start" name="refresh" size="sm" decorative />
+              Reset
+            </ModusWcButton>
+            <ModusWcTypography
+              hierarchy="p" size="xs"
+              label={executionProgress || "Ready · Press Run to simulate"}
+              customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)]"
+            />
             <div className="flex-1" />
-            <ModusWcTypography hierarchy="p" size="xs" label="Trimble AI can make mistakes. Verify critical estimates." customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)] italic" />
+            <ModusWcTypography hierarchy="p" size="xs" label="AI estimates may vary. Verify critical results." customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)] italic" />
           </div>
         )}
       </div>
+      <ScriptModal />
     </div>
   );
 }

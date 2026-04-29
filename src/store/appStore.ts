@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Project, Workflow } from "@/types";
+import { apiGet } from "@/api/http";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -20,6 +21,8 @@ const SEED_PROJECTS: Project[] = [
 
 interface AppStore {
   projects: Project[];
+  /** Merge server projects when API is up; no-op on failure. */
+  fetchProjectsFromApi: () => Promise<void>;
   addProject: (name: string, description?: string) => Project;
   addWorkflow: (projectId: string, name: string, description?: string) => Workflow | null;
   deleteWorkflow: (projectId: string, workflowId: string) => void;
@@ -29,6 +32,15 @@ interface AppStore {
 
 export const useAppStore = create<AppStore>((set, get) => ({
   projects: SEED_PROJECTS,
+
+  fetchProjectsFromApi: async () => {
+    try {
+      const data = await apiGet<Project[]>("/api/projects");
+      if (Array.isArray(data) && data.length > 0) set({ projects: data });
+    } catch {
+      /* offline or server down — keep seed */
+    }
+  },
 
   addProject: (name, description) => {
     const project: Project = {

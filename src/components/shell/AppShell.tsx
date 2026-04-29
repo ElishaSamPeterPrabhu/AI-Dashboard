@@ -10,8 +10,10 @@ import {
   ModusWcButton,
   ModusWcModal,
   ModusWcTextInput,
+  ModusWcBadge,
 } from "@trimble-oss/moduswebcomponents-react";
 import { useAppStore } from "@/store/appStore";
+import { badgeColorForProjectId } from "@/utils/projectBadgeColor";
 
 const MOBILE_BP = 768;
 
@@ -34,7 +36,11 @@ export default function AppShell() {
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set(["p1"]));
 
-  const { projects, addProject, addWorkflow } = useAppStore();
+  const { projects, addProject, addWorkflow, fetchProjectsFromApi } = useAppStore();
+
+  useEffect(() => {
+    void fetchProjectsFromApi();
+  }, [fetchProjectsFromApi]);
   const mobile = width < MOBILE_BP;
 
   useEffect(() => {
@@ -86,7 +92,7 @@ export default function AppShell() {
 
       {/* ── Navbar ──────────────────────────────────────── */}
       <ModusWcNavbar
-        visibility={{ mainMenu: true, user: true, apps: true, notifications: true, search: false, help: false, ai: false, searchInput: false }}
+        visibility={{ mainMenu: true, user: true, apps: false, notifications: false, search: false, help: false, ai: false, searchInput: false }}
         customClass="flex-shrink-0"
       >
         <div slot="start" className="flex items-center gap-2 pl-2">
@@ -122,28 +128,37 @@ export default function AppShell() {
         aria-hidden
       />
 
-      {/* Card: starts 8px below the navbar bottom */}
+      {/* Card: below navbar, height follows content (capped to viewport). */}
       <div
         className={`
-          fixed left-3 bottom-3 z-[110]
-          flex flex-col
+          nf-projects-drawer
+          fixed left-3 z-[110] w-64
+          flex flex-col rounded-xl overflow-hidden shadow-2xl
+          border border-solid border-[var(--modus-wc-color-base-300)]
+          bg-[var(--modus-wc-color-base-page)]
+          max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain
           transition-all duration-300 ease-out
           ${sidebarOpen
             ? "translate-x-0 opacity-100 pointer-events-auto"
             : "-translate-x-[calc(100%+1rem)] opacity-0 pointer-events-none"}
         `}
-        style={{ top: 56 + 8, width: 256 }}
+        style={{ top: 56 + 8 }}
       >
+        {/*
+          Do not use bordered on ModusWcCard: Modus only sets a surface fill on
+          .modus-wc-card:not(.modus-wc-card-bordered), so bordered cards stay transparent
+          and only nested menus look solid. Outer frame supplies radius + edge.
+          Use base-page everywhere so modus-wc-menu (also base-page) matches the shell.
+        */}
         <ModusWcCard
-          bordered
-          customClass="h-full flex flex-col overflow-hidden !rounded-xl shadow-2xl"
+          customClass="flex flex-col !rounded-none !shadow-none"
         >
-          <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex flex-col bg-[var(--modus-wc-color-base-page)] pb-2">
 
             {/* Header */}
             <div className="flex items-center justify-between px-3 pt-3 pb-1 flex-shrink-0">
               <ModusWcTypography
-                hierarchy="p" size="xs" weight="semibold" label="PROJECTS"
+                hierarchy="p" size="md" weight="semibold" label="PROJECTS"
                 customClass="text-[var(--modus-wc-color-base-content-low-contrast)] m-0 tracking-wider"
               />
               <ModusWcButton
@@ -155,8 +170,8 @@ export default function AppShell() {
               </ModusWcButton>
             </div>
 
-            {/* Scrollable project list */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+            {/* Project list (outer panel scrolls if list exceeds max-h) */}
+            <div className="overflow-x-hidden">
               <ModusWcMenu size="md">
                 {projects.map((project) => {
                   const isExpanded = expandedProjects.has(project.id);
@@ -173,14 +188,16 @@ export default function AppShell() {
                           closeAndNavigate(`/projects/${project.id}`);
                         }}
                       >
-                        <span
+                        <ModusWcBadge
                           slot="start-icon"
-                          className="flex items-center justify-center w-5 h-5 rounded text-white text-xs font-bold flex-shrink-0"
-                          style={{ background: project.color ?? "#0063a3" }}
+                          color={badgeColorForProjectId(project.id)}
+                          size="sm"
+                          variant="counter"
+                          customClass="nf-project-menu-badge flex-shrink-0"
                           aria-hidden
                         >
                           {project.name.charAt(0).toUpperCase()}
-                        </span>
+                        </ModusWcBadge>
                         <ModusWcIcon
                           slot="end-icon"
                           name={isExpanded ? "expand_less" : "expand_more"}

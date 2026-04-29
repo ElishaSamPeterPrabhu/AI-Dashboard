@@ -7,6 +7,7 @@ import {
   ModusWcBadge,
 } from "@trimble-oss/moduswebcomponents-react";
 import { useAppStore } from "@/store/appStore";
+import { badgeColorForProjectId } from "@/utils/projectBadgeColor";
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -36,12 +37,15 @@ export default function ProjectPage() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <span
-              className="flex items-center justify-center w-12 h-12 rounded-xl text-white text-lg font-bold flex-shrink-0"
-              style={{ background: project.color ?? "#0063a3" }}
+            <ModusWcBadge
+              color={badgeColorForProjectId(project.id)}
+              size="lg"
+              variant="counter"
+              customClass="flex-shrink-0"
+              aria-hidden
             >
-              {project.name.charAt(0)}
-            </span>
+              {project.name.charAt(0).toUpperCase()}
+            </ModusWcBadge>
             <div className="flex flex-col gap-1">
               <ModusWcTypography hierarchy="h4" size="xl" weight="bold" label={project.name} customClass="m-0 text-[var(--modus-wc-color-base-content)]" />
               {project.description && (
@@ -73,9 +77,9 @@ export default function ProjectPage() {
                 onClick={() => navigate(`/projects/${project.id}/workflows/${wf.id}`)}
               >
                 <div className="flex items-start gap-3 p-4">
-                  <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--modus-wc-color-base-200)] flex-shrink-0">
+                  <ModusWcBadge color="tertiary" variant="outlined" size="md" customClass="flex-shrink-0" aria-hidden>
                     <ModusWcIcon name="schema" size="sm" decorative customClass="text-[var(--modus-wc-color-primary)]" />
-                  </div>
+                  </ModusWcBadge>
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
                     <ModusWcTypography hierarchy="p" size="sm" weight="semibold" label={wf.name} customClass="m-0 text-[var(--modus-wc-color-base-content)] truncate" />
                     {wf.description && (
@@ -83,7 +87,9 @@ export default function ProjectPage() {
                     )}
                     <ModusWcTypography hierarchy="p" size="xs" label={`Updated ${formatDate(wf.updatedAt)}`} customClass="m-0 text-[var(--modus-wc-color-base-content-low-contrast)]" />
                   </div>
-                  <ModusWcBadge text="Plan" color="secondary" size="sm" customClass="flex-shrink-0" />
+                  <ModusWcBadge color="secondary" size="sm" customClass="flex-shrink-0">
+                    Plan
+                  </ModusWcBadge>
                 </div>
               </ModusWcCard>
             ))}
