@@ -86,7 +86,7 @@ const GROUPS: { title: string; items: PaletteItem[] }[] = [
     title: "Connect",
     items: [
       {
-        type: "connector", label: "Connector", icon: "arrow_forward",
+        type: "connector", label: "Connector", icon: "file_merge",
         description: "Pass data to another section", accent: "#0891b222",
       },
     ],
