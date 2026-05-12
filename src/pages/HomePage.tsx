@@ -72,7 +72,7 @@ export default function HomePage() {
                 {totalWorkflows > 0 && (
                   <ModusWcButton
                     variant="outlined"
-                    color="secondary"
+                    color="tertiary"
                     size="md"
                     onButtonClick={() => navigate(`/projects/${projects[0].id}`)}
                   >

@@ -3,12 +3,18 @@ import AppShell from "@/components/shell/AppShell";
 import HomePage from "@/pages/HomePage";
 import ProjectPage from "@/pages/ProjectPage";
 import CanvasPage from "@/pages/CanvasPage";
+import DemoPage from "@/pages/DemoPage";
+import ModusDemoPage from "@/pages/ModusDemoPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
+        {/* Standalone demo — no AppShell wrapper */}
+        <Route path="/demo/modus" element={<ModusDemoPage />} />
+        <Route path="/demo" element={<DemoPage />} />
+
         <Route path="/" element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="projects/:projectId" element={<ProjectPage />} />

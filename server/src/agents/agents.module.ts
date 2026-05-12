@@ -7,5 +7,6 @@ import { McpModule } from "../mcp/mcp.module";
   imports: [McpModule],
   controllers: [AgentsController],
   providers: [TrimbleAgentsService],
+  exports: [TrimbleAgentsService],
 })
 export class AgentsModule {}

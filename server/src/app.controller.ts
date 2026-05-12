@@ -26,6 +26,15 @@ export class AppController {
   }
 
   /**
+   * Same-origin token proxy for the Trimble Assist embed (`AgenticFullChat` / iframe SDK).
+   * GET /api/auth/token-for-ui
+   */
+  @Get("auth/token-for-ui")
+  getTokenForUi() {
+    return { token: process.env.TRIMBLE_AGENT_API_KEY ?? "" };
+  }
+
+  /**
    * Hot-reload the Trimble API token without restarting the server.
    * POST /api/auth/token  { "token": "<bearer token>" }
    * Call this from the browser console after a fresh login:

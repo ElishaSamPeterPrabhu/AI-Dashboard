@@ -157,7 +157,7 @@ function AgentBindingWidget({
             <ModusWcIcon slot="start" name="ai_stars" size="sm" decorative />
             {loading ? "Creating…" : "Auto-create agent"}
           </ModusWcButton>
-          <ModusWcButton variant="outlined" color="secondary" size="sm" onButtonClick={() => void openPicker()}>
+          <ModusWcButton variant="outlined" color="tertiary" size="sm" onButtonClick={() => void openPicker()}>
             <ModusWcIcon slot="start" name="link" size="sm" decorative />
             Bind existing agent
           </ModusWcButton>
@@ -334,7 +334,7 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
           label={`Configure: ${typeLabel}`}
           customClass="m-0 text-[var(--modus-wc-color-base-content)]"
         />
-        <ModusWcButton size="sm" variant="borderless" color="secondary" shape="square" aria-label="Close" onButtonClick={onClose}>
+        <ModusWcButton size="sm" variant="borderless" color="tertiary" shape="square" aria-label="Close" onButtonClick={onClose}>
           <ModusWcIcon name="close" size="sm" decorative />
         </ModusWcButton>
       </div>
@@ -521,7 +521,7 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
                     {entry.value || "—"}
                   </span>
                 </div>
-                <ModusWcButton size="sm" variant="borderless" color="secondary" shape="square" onButtonClick={() => removeEntry(idx)}>
+                <ModusWcButton size="sm" variant="borderless" color="tertiary" shape="square" onButtonClick={() => removeEntry(idx)}>
                   <ModusWcIcon name="close" size="sm" decorative />
                 </ModusWcButton>
               </div>

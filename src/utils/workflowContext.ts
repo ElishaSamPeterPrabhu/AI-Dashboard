@@ -4,13 +4,13 @@ import type { AgentRunResult } from "@/types/agent";
 /** Context key for an upstream node when building `inputContext` for an AI node. */
 export function contextKeyForNode(n: Node): string {
   const d = n.data as Record<string, unknown>;
+  // plannerKey is always the camelCase key the AI uses in formulas — prefer it for all node types
+  const pk = (d.plannerKey as string)?.trim();
+  if (pk) return pk;
+  // Fallback for manually placed nodes without plannerKey
   if (n.type === "input" || n.type === "assumption") {
     const k = (d.description as string)?.trim();
-    if (k) return k;
-  }
-  if (n.type === "database") {
-    const label = (d.label as string)?.trim();
-    if (label) return label.replace(/\s+/g, "_").toLowerCase();
+    if (k && !k.includes(" ")) return k; // only use description if it looks like a variable name
   }
   const label = (d.label as string)?.trim() || n.id;
   return label.replace(/\s+/g, "_").toLowerCase();

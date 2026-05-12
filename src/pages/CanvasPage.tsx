@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   ReactFlow,
@@ -16,7 +16,7 @@ import {
   ModusWcButton,
   ModusWcIcon,
   ModusWcBadge,
-  ModusWcTooltip,
+  ModusWcTabs,
 } from "@trimble-oss/moduswebcomponents-react";
 
 import { TEST_WORKFLOW } from "@/data/testWorkflow";
@@ -163,6 +163,28 @@ export default function CanvasPage() {
 
   const isEmpty = nodes.length === 0;
 
+  const workflowModeTabs = useMemo(
+    () => [
+      { label: "Plan", icon: "edit", iconPosition: "left" as const },
+      {
+        label: "Execute",
+        icon: "play_arrow",
+        iconPosition: "left" as const,
+        disabled: nodes.length === 0,
+      },
+    ],
+    [nodes.length],
+  );
+
+  const onWorkflowModeTabChange = useCallback(
+    (e: CustomEvent<{ previousTab: number; newTab: number }>) => {
+      const idx = e.detail.newTab;
+      if (idx === 0) setMode("plan");
+      else if (idx === 1 && nodes.length > 0) setMode("execute");
+    },
+    [nodes.length, setMode],
+  );
+
   // ── Load the test workflow ──────────────────────────────
   const loadTestWorkflow = () => {
     resetExecution();
@@ -182,10 +204,14 @@ export default function CanvasPage() {
           `/api/workflows/${workflowId}/canvas`
         );
         if (cancelled) return;
-        if (data.nodes?.length) {
-          resetExecution();
-          setNodes(data.nodes);
-          setEdges((data.edges ?? []).map((e) => ({ ...e, animated: false })));
+        const loadedNodes = Array.isArray(data.nodes) ? data.nodes : [];
+        const loadedEdges = Array.isArray(data.edges) ? data.edges : [];
+        setNodes(loadedNodes);
+        setEdges(loadedEdges.map((e) => ({ ...e, animated: false })));
+        resetExecution();
+        // Auto-fit after nodes are set — slight delay lets React Flow measure node sizes first
+        if (loadedNodes.length > 0) {
+          setTimeout(() => rfInstance?.fitView({ padding: 0.12, duration: 400 }), 120);
         }
 
         // Check for pending input from a Connector node in another workflow
@@ -274,37 +300,22 @@ export default function CanvasPage() {
             )}
           </div>
 
-          {/* Centre: Plan / Execute toggle (absolutely centred) */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-[var(--modus-wc-color-base-200)] rounded-lg p-1">
-            <ModusWcButton
-              variant={mode === "plan" ? "filled" : "borderless"}
-              color={mode === "plan" ? "primary" : "secondary"}
+          {/* Centre: Plan / Execute (modus-wc-tabs) */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+            <ModusWcTabs
+              aria-label="Workflow mode"
               size="sm"
-              onButtonClick={() => setMode("plan")}
-              aria-pressed={mode === "plan"}
-            >
-              <ModusWcIcon slot="start" name="edit" size="sm" decorative />
-              Plan
-            </ModusWcButton>
-            <ModusWcTooltip text={nodes.length === 0 ? "Add nodes to enable Execute" : "Run the simulation"} position="bottom">
-              <ModusWcButton
-                variant={mode === "execute" ? "filled" : "borderless"}
-                color={mode === "execute" ? "primary" : "secondary"}
-                size="sm"
-                disabled={nodes.length === 0}
-                onButtonClick={() => nodes.length > 0 && setMode("execute")}
-                aria-pressed={mode === "execute"}
-              >
-                <ModusWcIcon slot="start" name="play_arrow" size="sm" decorative />
-                Execute
-              </ModusWcButton>
-            </ModusWcTooltip>
+              tabStyle="boxed"
+              activeTabIndex={mode === "plan" ? 0 : 1}
+              tabs={workflowModeTabs}
+              onTabChange={onWorkflowModeTabChange}
+            />
           </div>
 
           {/* Right slot: empty canvas helper + execute badge */}
           <div className="flex items-center gap-2 flex-1 justify-end">
             {isEmpty && (
-              <ModusWcButton variant="outlined" color="secondary" size="sm" onButtonClick={loadTestWorkflow}>
+              <ModusWcButton variant="outlined" color="tertiary" size="sm" onButtonClick={loadTestWorkflow}>
                 <ModusWcIcon slot="start" name="schema" size="sm" decorative />
                 Load test workflow
               </ModusWcButton>
@@ -379,7 +390,7 @@ export default function CanvasPage() {
               Stop
             </ModusWcButton>
             <ModusWcButton
-              variant="outlined" color="secondary" size="sm"
+              variant="outlined" color="tertiary" size="sm"
               disabled={isExecuting}
               onButtonClick={() => resetExecution()}
             >

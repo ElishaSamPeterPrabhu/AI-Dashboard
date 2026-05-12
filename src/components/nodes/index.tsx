@@ -1,5 +1,10 @@
-import React from "react";
+import React, { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { Handle, Position, NodeResizer, type NodeProps } from "@xyflow/react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
 import type { ExecState } from "@/store/canvasStore";
 
 // ─── Node width — set on the RF node object so the wrapper matches ───
@@ -55,12 +60,123 @@ function StatusBar({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-/** Result line shown at the bottom of a node once execution finishes */
-function ResultLine({ data }: { data: Record<string, unknown> }) {
+/**
+ * Shows text truncated to 1 line with ellipsis on the canvas node.
+ * A small "⋯" button opens a portal dialog with the full text.
+ * Very short text (≤30 chars, single line) shows inline with no button.
+ *
+ * All hooks are at the top — no early returns before them.
+ */
+function ExpandableNodeText({
+  title,
+  text,
+  variant = "default",
+}: {
+  title: string;
+  text: string;
+  variant?: "default" | "mono" | "result" | "aiSub";
+}) {
+  const dlgTitleId = useId();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onEsc = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // Very short single-line text — show inline, no expand button needed.
+  const dense = trimmed.length <= 30 && !trimmed.includes("\n");
+
+  if (dense) {
+    return (
+      <div
+        className={`nf-expand-preview nf-expand-preview--dense nf-expand-preview--${variant}`}
+        title={trimmed}
+      >
+        {trimmed}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={`nf-expand-row nf-expand-row--${variant}`}>
+        <div className={`nf-expand-preview nf-expand-preview--${variant}`}>
+          {trimmed}
+        </div>
+        <button
+          type="button"
+          className="nf-expand-more"
+          onClick={(ev) => {
+            ev.stopPropagation();
+            ev.preventDefault();
+            setOpen(true);
+          }}
+          aria-label={`View full ${title}`}
+          title={`View full ${title}`}
+        >
+          &#8943;
+        </button>
+      </div>
+      {open &&
+        createPortal(
+          <div
+            className="nf-node-text-modal-overlay"
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
+          >
+            <div className="nf-node-text-modal" role="dialog" aria-labelledby={dlgTitleId} aria-label={title}>
+              <div className="nf-node-text-modal__head">
+                <span id={dlgTitleId}>{title}</span>
+                <button
+                  type="button"
+                  className="nf-node-text-modal__close"
+                  aria-label="Close"
+                  onClick={() => setOpen(false)}
+                >
+                  &#10005;
+                </button>
+              </div>
+              <pre className="nf-node-text-modal__pre">{trimmed}</pre>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
+
+/** Execution result line — green chip when done, clamped when long */
+function ExecResultChip({ data }: { data: Record<string, unknown> }) {
   const state = (data.executionState as ExecState) ?? "idle";
-  const result = data._result as string | undefined;
+  // _result may be a number or object — always stringify before using as text
+  const raw = data._result;
+  const result = raw != null ? String(raw).trim() : "";
   if (state !== "done" || !result) return null;
-  return <div className="nf-result" title={result}>{result}</div>;
+  return (
+    <div className="nf-result-slot">
+      <ExpandableNodeText title="Execution result" text={result} variant="result" />
+    </div>
+  );
 }
 
 // ─── Sticky / Note ───────────────────────────────────────────────
@@ -114,7 +230,7 @@ export function ProcessNode({ data, selected }: NodeProps) {
           <span className="nf-node__label">{d.label || "Process"}</span>
         </div>
         {d.description && <div className="nf-node__sub">{d.description}</div>}
-        <ResultLine data={d} />
+        <ExecResultChip data={d} />
         <Handle type="source" position={Position.Bottom} className="node-handle" />
       </div>
     </div>
@@ -128,17 +244,18 @@ export function InputNode({ data, selected }: NodeProps) {
     <div className={`relative ${execClass(d)}`}>
       <StatusBar data={d} />
       <div className="nf-node nf-node--input" style={{ ...ring(!!selected) }}>
+        <Handle type="target" position={Position.Top} className="node-handle" />
         <Handle type="source" position={Position.Bottom} className="node-handle" />
         <div className="nf-node__icon-row">
           <span className="nf-node__type-badge nf-node__type-badge--blue">IN</span>
           <span className="nf-node__label">{d.label || "Input"}</span>
         </div>
         {d.value ? (
-          <div className="nf-node__value">{d.value}</div>
+          <ExpandableNodeText title="Input value" text={String(d.value)} variant="mono" />
         ) : (
           <div className="nf-node__placeholder">No value set</div>
         )}
-        <ResultLine data={d} />
+        <ExecResultChip data={d} />
       </div>
     </div>
   );
@@ -158,8 +275,13 @@ export function CalculatorNode({ data, selected }: NodeProps) {
           </span>
           <span className="nf-node__label">{d.label || "Calculator"}</span>
         </div>
-        {d.formula && <div className="nf-node__mono">{d.formula}</div>}
-        <ResultLine data={d} />
+        {d.formula &&
+          (String(d.formula).length > 72 || String(d.formula).includes("\n") ? (
+            <ExpandableNodeText title="Formula" text={String(d.formula)} variant="mono" />
+          ) : (
+            <div className="nf-node__mono">{d.formula}</div>
+          ))}
+        <ExecResultChip data={d} />
         <Handle type="source" position={Position.Bottom} className="node-handle" />
       </div>
     </div>
@@ -168,47 +290,241 @@ export function CalculatorNode({ data, selected }: NodeProps) {
 
 // ─── Output / Result ─────────────────────────────────────────────
 export function OutputNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; value?: unknown } & Record<string,unknown>;
-  const val = d.value != null ? String(d.value) : null;
+  const d = data as { label?: string; value?: unknown; _result?: unknown } & Record<string, unknown>;
+  const execState = (d.executionState as ExecState) ?? "idle";
+
+  const resultStr = d._result != null && String(d._result).trim() !== "" ? String(d._result).trim() : "";
+  const valStr = d.value != null && String(d.value).trim() !== "" ? String(d.value).trim() : "";
+
+  // Single line: after run, executor sets both value and _result to the same string — show once.
+  const displayText =
+    execState === "done" && resultStr
+      ? resultStr
+      : resultStr || valStr;
+  const variant: "default" | "result" = execState === "done" && resultStr ? "result" : "default";
+
   return (
     <div className={`relative ${execClass(d)}`}>
       <StatusBar data={d} />
       <div className="nf-node nf-node--output" style={{ ...ring(!!selected) }}>
         <Handle type="target" position={Position.Top} className="node-handle" />
+        {/* Source handle allows output nodes to feed into a connector (multi-lane merge) */}
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
         <div className="nf-node__icon-row">
           <span className="nf-node__type-badge nf-node__type-badge--green">OUT</span>
           <span className="nf-node__label">{d.label || "Result"}</span>
         </div>
-        {val ? (
-          <div className="nf-node__value nf-node__value--large">{val}</div>
+        {displayText ? (
+          <ExpandableNodeText title="Output value" text={displayText} variant={variant} />
         ) : (
           <div className="nf-node__placeholder">Awaiting value</div>
         )}
-        <ResultLine data={d} />
       </div>
     </div>
   );
 }
 
 // ─── Chart ───────────────────────────────────────────────────────
+const CHART_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#3b82f6", "#a78bfa"];
+
+/** Bar chart icon — SVG so it works inside React Flow (Modus ligature icons often fail on canvas). */
+function ChartIconSvg() {
+  return (
+    <svg className="nf-chart-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+      <rect x="1" y="7" width="3" height="6" rx="0.5" fill="currentColor" opacity={0.82} />
+      <rect x="5.5" y="4" width="3" height="9" rx="0.5" fill="currentColor" />
+      <rect x="10" y="6" width="3" height="7" rx="0.5" fill="currentColor" opacity={0.72} />
+    </svg>
+  );
+}
+
+function ChartVisualization({
+  chartType,
+  chartData,
+  compact,
+}: {
+  chartType: string;
+  chartData: Array<{ name: string; value: number }>;
+  compact: boolean;
+}) {
+  const isPie = chartType === "pie";
+  const h = compact ? 100 : 380;
+  const nameMax = compact ? 8 : 24;
+  const tickFmt = (v: string) =>
+    v.length > nameMax ? `${v.slice(0, nameMax - 1)}…` : v;
+
+  if (isPie) {
+    return (
+      <ResponsiveContainer width="100%" height={compact ? 118 : 340}>
+        <PieChart>
+          <Pie
+            data={chartData}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy={compact ? "48%" : "45%"}
+            outerRadius={compact ? 38 : 118}
+            label={false}
+          >
+            {chartData.map((_, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Pie>
+          <Legend
+            wrapperStyle={{ fontSize: compact ? 9 : 11, lineHeight: "16px" }}
+            formatter={(v: string) => tickFmt(v)}
+          />
+          <Tooltip
+            contentStyle={{ fontSize: 11, padding: "4px 8px" }}
+            formatter={(v: number) => v.toLocaleString()}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={h}>
+      <BarChart
+        data={chartData}
+        margin={
+          compact
+            ? { top: 4, right: 4, left: -28, bottom: 0 }
+            : { top: 12, right: 16, left: 8, bottom: 8 }
+        }
+      >
+        <XAxis dataKey="name" tick={{ fontSize: compact ? 8 : 11 }} tickFormatter={tickFmt} interval={0} />
+        <YAxis
+          tick={{ fontSize: compact ? 8 : 11 }}
+          tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
+        />
+        <Tooltip
+          contentStyle={{ fontSize: 11, padding: "4px 8px" }}
+          formatter={(v: number) => v.toLocaleString()}
+        />
+        <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+          {chartData.map((_, i) => (
+            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ─── Chart node ──────────────────────────────────────────────────
 export function ChartNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; chartType?: string } & Record<string,unknown>;
+  const d = data as {
+    label?: string;
+    chartType?: string;
+    _chartData?: Array<{ name: string; value: number }>;
+  } & Record<string, unknown>;
+
+  const dlgTitleId = useId();
+  const [modalOpen, setModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+    const onEsc = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") setModalOpen(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [modalOpen]);
+
+  const chartType = (d.chartType ?? "bar").toLowerCase();
+  const chartData = (d._chartData as Array<{ name: string; value: number }> | undefined) ?? [];
+  const hasData = chartData.length > 0;
+  const execState = (d.executionState as ExecState) ?? "idle";
+  const showChart = hasData && execState === "done";
+  const modalTitle = `${d.label?.trim() || "Chart"} (${chartType})`;
+
   return (
     <div className={`relative ${execClass(d)}`}>
       <StatusBar data={d} />
-      <div className="nf-node" style={{ ...ring(!!selected) }}>
+      <div className="nf-node nf-node--chart" style={{ ...ring(!!selected), minWidth: 180 }}>
         <Handle type="target" position={Position.Top} className="node-handle" />
         <div className="nf-node__icon-row">
-          <span className="nf-node__icon nf-node__icon--neutral">
-            <i className="modus-icons modus-wc-icon--sm" aria-hidden>bar_chart</i>
+          <span className="nf-node__icon nf-node__icon--neutral" aria-hidden>
+            <ChartIconSvg />
           </span>
           <span className="nf-node__label">{d.label || "Chart"}</span>
           {d.chartType && (
-            <span className="nf-node__sub" style={{ marginLeft: "auto" }}>{d.chartType}</span>
+            <span className="nf-node__sub" style={{ marginLeft: "auto", textTransform: "capitalize" }}>
+              {d.chartType}
+            </span>
+          )}
+          {showChart && (
+            <button
+              type="button"
+              className="nf-expand-more"
+              onClick={(ev) => {
+                ev.stopPropagation();
+                ev.preventDefault();
+                setModalOpen(true);
+              }}
+              aria-label="View larger chart"
+              title="View larger chart"
+            >
+              &#8943;
+            </button>
           )}
         </div>
-        <ResultLine data={d} />
+
+        {showChart ? (
+          <div className="nf-chart-node__preview" style={{ width: "100%", marginTop: 6 }}>
+            <ChartVisualization chartType={chartType} chartData={chartData} compact />
+          </div>
+        ) : (
+          <div className="nf-node__placeholder">
+            {execState === "running" ? "Rendering…" : "Run to visualise"}
+          </div>
+        )}
+
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
       </div>
+      {modalOpen &&
+        createPortal(
+          <div
+            className="nf-node-text-modal-overlay"
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setModalOpen(false);
+            }}
+          >
+            <div
+              className="nf-node-text-modal nf-node-text-modal--chart"
+              role="dialog"
+              aria-labelledby={dlgTitleId}
+              aria-label={modalTitle}
+            >
+              <div className="nf-node-text-modal__head">
+                <span id={dlgTitleId}>{modalTitle}</span>
+                <button
+                  type="button"
+                  className="nf-node-text-modal__close"
+                  aria-label="Close"
+                  onClick={() => setModalOpen(false)}
+                >
+                  &#10005;
+                </button>
+              </div>
+              <div className="nf-node-text-modal__chart-body">
+                <ChartVisualization chartType={chartType} chartData={chartData} compact={false} />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
@@ -248,12 +564,12 @@ export function AiNode({ data, selected, id }: NodeProps) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%" }} className={execClass(d)}>
+    <div style={{ position: "relative", width: "100%", minWidth: 0, maxWidth: "100%" }} className={execClass(d)}>
       <StatusBar data={d} />
       <Handle type="target" position={Position.Top} className="node-handle" />
       <div
         className="ai-ux-gradient-frame"
-        style={{ width: "100%", boxSizing: "border-box", ...ring(!!selected) }}
+        style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box", minWidth: 0, ...ring(!!selected) }}
       >
         <div className="ai-ux-gradient-frame__glow" aria-hidden />
         <div className="ai-ux-gradient-frame__inner nf-ai">
@@ -275,11 +591,20 @@ export function AiNode({ data, selected, id }: NodeProps) {
             <span className="nf-ai__dot" style={{ background: dot }} title={status} />
           </div>
           <div className="nf-ai__sub">
-            {d.agentName
-              ? <><span className="nf-ai__agent-dot" />{d.agentName}</>
-              : (d.description || "Click to configure")}
+            {d.agentName ? (
+              <>
+                <span className="nf-ai__agent-dot" />
+                <span className="nf-ai__agent-name">{d.agentName}</span>
+              </>
+            ) : (
+              <ExpandableNodeText
+                title="AI instructions"
+                text={d.description?.trim() || "Click to configure"}
+                variant="aiSub"
+              />
+            )}
           </div>
-          <ResultLine data={d} />
+          <ExecResultChip data={d} />
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="node-handle" />
@@ -347,7 +672,7 @@ export function DatabaseNode({ data, selected }: NodeProps) {
           {entries.length > 3 && (
             <div className="nf-db__placeholder">+{entries.length - 3} more…</div>
           )}
-          <ResultLine data={d} />
+          <ExecResultChip data={d} />
         </div>
         <div className="nf-db__cap nf-db__cap--bottom" />
       </div>
@@ -386,7 +711,7 @@ export function TriggerNode({ data, selected }: NodeProps) {
           <span className="nf-trigger__sub">{sub}</span>
         </div>
       </div>
-      <ResultLine data={d} />
+      <ExecResultChip data={d} />
       <Handle type="source" position={Position.Bottom} className="node-handle" />
     </div>
   );
@@ -425,6 +750,7 @@ export function AssumptionNode({ data, selected }: NodeProps) {
     <div className={`relative ${execClass(d)}`}>
       <StatusBar data={d} />
       <div className="nf-node nf-node--assumption" style={{ ...ring(!!selected) }}>
+        <Handle type="target" position={Position.Top} className="node-handle" />
         <Handle type="source" position={Position.Bottom} className="node-handle" />
         <div className="nf-node__icon-row">
           <span className="nf-node__type-badge nf-node__type-badge--purple">~</span>
@@ -438,7 +764,7 @@ export function AssumptionNode({ data, selected }: NodeProps) {
           <div className="nf-node__placeholder">Set min / max</div>
         )}
         <div className="nf-assumption__dist">{dist}</div>
-        <ResultLine data={d} />
+        <ExecResultChip data={d} />
       </div>
     </div>
   );
@@ -500,7 +826,7 @@ export function ConnectorNode({ data, selected }: NodeProps) {
         {d.description && (
           <div className="nf-connector__desc">{d.description as string}</div>
         )}
-        <ResultLine data={d} />
+        <ExecResultChip data={d} />
       </div>
       <Handle type="source" position={Position.Bottom} className="node-handle" />
     </div>

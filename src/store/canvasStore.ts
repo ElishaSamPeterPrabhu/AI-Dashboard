@@ -285,6 +285,41 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
               _result: displayValue,
               _resultRaw: rawValue,
             });
+          } else if (n.type === "output") {
+            // Output node: pull value from the first upstream node's result
+            const nodesNow = get().nodes;
+            const edgesNow = get().edges;
+            const ctx = assembleInputContext(n.id, nodesNow, edgesNow);
+            const firstVal = Object.values(ctx).find((v) => v != null);
+            const result = firstVal != null ? String(firstVal) : null;
+            patchNodes([n.id], {
+              executionState: "done" as ExecState,
+              ...(result != null ? { _result: result, value: result } : {}),
+            });
+          } else if (n.type === "chart") {
+            // Chart node: collect upstream context and pick keys to plot
+            const nodesNow = get().nodes;
+            const edgesNow = get().edges;
+            const ctx = assembleInputContext(n.id, nodesNow, edgesNow);
+            const chartKeys = (n.data.chartKeys as string[] | undefined) ?? [];
+            // Build chart data: use chartKeys if provided, else all numeric context keys
+            const numericCtx = Object.entries(ctx)
+              .filter(([, v]) => {
+                const num = typeof v === "number" ? v : parseFloat(String(v ?? "").replace(/[$,€£%\s]/g, ""));
+                return !isNaN(num);
+              })
+              .map(([k, v]) => ({
+                name: k,
+                value: typeof v === "number" ? v : parseFloat(String(v).replace(/[$,€£%\s]/g, "")),
+              }));
+            const plotData = chartKeys.length > 0
+              ? numericCtx.filter((e) => chartKeys.includes(e.name))
+              : numericCtx;
+            patchNodes([n.id], {
+              executionState: "done" as ExecState,
+              _chartData: plotData,
+              _result: plotData.map((e) => `${e.name}: ${e.value}`).join(", "),
+            });
           } else {
             const result = n.type === "input"
               ? ((n.data.value as string) ?? n.data.executionResult)
@@ -339,8 +374,14 @@ async function runAiNode(
   const edgesNow = get().edges;
   const wfId = get().workflowId ?? "";
   const d = n.data as Record<string, unknown>;
-  const systemPrompt = String(d.description ?? "");
+  const rawPrompt = String(d.description ?? "");
   const inputContext = assembleInputContext(n.id, nodesNow, edgesNow, get().sharedContext);
+  // Pre-substitute {{varName}} tokens so the agent receives final values, not placeholders.
+  // This prevents the agent from trying to recalculate things already computed in the canvas.
+  const systemPrompt = rawPrompt.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+    const v = inputContext[key];
+    return v != null ? String(v) : `{{${key}}}`;
+  });
   const agentId = (d.agentId as string)?.trim();
   const staticFallback = d.executionResult != null ? String(d.executionResult) : undefined;
 

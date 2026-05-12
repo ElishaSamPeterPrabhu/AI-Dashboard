@@ -117,6 +117,21 @@ export class StoreService {
     return wf;
   }
 
+  /** Resolve a workflow by id across all projects (demo store is flat per workflow canvas). */
+  findWorkflowById(workflowId: string): { projectId: string; workflow: WorkflowDto } | null {
+    for (const p of this.projects) {
+      const wf = p.workflows.find((w) => w.id === workflowId);
+      if (wf) return { projectId: p.id, workflow: wf };
+    }
+    return null;
+  }
+
+  touchWorkflow(projectId: string, workflowId: string): void {
+    const p = this.getProject(projectId);
+    const wf = p?.workflows.find((w) => w.id === workflowId);
+    if (wf) wf.updatedAt = new Date().toISOString();
+  }
+
   getCanvas(workflowId: string): CanvasStateDto {
     return this.canvases.get(workflowId) ?? { nodes: [], edges: [] };
   }

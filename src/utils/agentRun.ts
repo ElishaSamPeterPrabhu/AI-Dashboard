@@ -1,4 +1,5 @@
 import type { AgentRunRequest, AgentRunResult } from "@/types/agent";
+import { useAppStore } from "@/store/appStore";
 
 function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
@@ -128,6 +129,15 @@ export async function liveAgentRun(
   }
 }
 
+/**
+ * Live Trimble runs go to POST /api/agents/:id/runs (BFF uses server/.env token — never exposed to Vite).
+ * - `VITE_LIVE_AGENTS=false` → always mock.
+ * - `VITE_LIVE_AGENTS=true` → always try live when `agentId` is set.
+ * - unset / other → use live if GET /api/health reported `agentKeySet` (refreshed with projects bootstrap).
+ */
 export function useLiveAgents(): boolean {
-  return import.meta.env.VITE_LIVE_AGENTS === "true";
+  const flag = import.meta.env.VITE_LIVE_AGENTS;
+  if (flag === "false") return false;
+  if (flag === "true") return true;
+  return useAppStore.getState().bffAgentConfigured === true;
 }

@@ -21,7 +21,9 @@ const SEED_PROJECTS: Project[] = [
 
 interface AppStore {
   projects: Project[];
-  /** Merge server projects when API is up; no-op on failure. */
+  /** From GET /api/health — server has TRIMBLE_AGENT_* so BFF can call Trimble agents. */
+  bffAgentConfigured: boolean | null;
+  /** Merge server projects when API is up; no-op on failure. Also refreshes `bffAgentConfigured`. */
   fetchProjectsFromApi: () => Promise<void>;
   addProject: (name: string, description?: string) => Project;
   addWorkflow: (projectId: string, name: string, description?: string) => Workflow | null;
@@ -32,6 +34,7 @@ interface AppStore {
 
 export const useAppStore = create<AppStore>((set, get) => ({
   projects: SEED_PROJECTS,
+  bffAgentConfigured: null,
 
   fetchProjectsFromApi: async () => {
     try {
@@ -39,6 +42,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       if (Array.isArray(data) && data.length > 0) set({ projects: data });
     } catch {
       /* offline or server down — keep seed */
+    }
+    try {
+      const h = await apiGet<{ agentKeySet?: boolean }>("/api/health");
+      set({ bffAgentConfigured: Boolean(h.agentKeySet) });
+    } catch {
+      set({ bffAgentConfigured: false });
     }
   },
 

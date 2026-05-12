@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "server"
+    "server",
+    "packages/@trimble-oss/agentic-ai-react"
   ],
   "scripts": {
     "dev": "vite",
@@ -12,9 +13,13 @@
     "dev:all": "concurrently -n ui,api -c blue,green \"npm run dev\" \"npm run dev:server\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ai": "node scripts/test-ai-bff.mjs",
+    "test:planner": "node scripts/test-planner-mcp.mjs"
   },
   "dependencies": {
+    "@trimble-oss/agentic-ai-react": "workspace:*",
+    "@trimble-agentic-external-npm-local/agentic-platform-sdk-iframe-typescript": "^1.0.1-rc.7",
     "@trimble-oss/modus-icons": "1.21.0",
     "@trimble-oss/moduswebcomponents": "1.2.0",
     "@trimble-oss/moduswebcomponents-react": "1.2.0-react19",
@@ -26,12 +31,12 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react-swc": "^3.9.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.4",
     "typescript": "~5.8.3",

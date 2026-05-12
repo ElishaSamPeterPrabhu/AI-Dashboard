@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* ─── ModusDemoPage shell borders ───────────────────────── */
+/* Using plain CSS because Tailwind 4 nested @media rules can
+   produce 0px border-width despite the class being present.    */
+.mdp-sidebar {
+  border-right: 1px solid #2d3748;
+}
+.mdp-border-b {
+  border-bottom: 1px solid #2d3748 !important;
+}
+.mdp-border-t {
+  border-top: 1px solid #2d3748 !important;
+}
+
 /* ─── Full-height app shell ─────────────────────────────── */
 html, body, #root {
   height: 100%;
@@ -263,6 +276,7 @@ modus-wc-badge.nf-canvas-project-badge {
   white-space: nowrap;
   line-height: 1.3;
   font-family: system-ui, sans-serif;
+  max-width: 10.95rem;
 }
 .nf-node__sub {
   font-size: 10px;
@@ -271,6 +285,7 @@ modus-wc-badge.nf-canvas-project-badge {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: system-ui, sans-serif;
+  max-width: 10.95rem;
 }
 .nf-node__value {
   font-size: 11px;
@@ -282,6 +297,7 @@ modus-wc-badge.nf-canvas-project-badge {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 10.95rem;
 }
 .nf-node__value--large {
   font-size: 13px;
@@ -294,6 +310,7 @@ modus-wc-badge.nf-canvas-project-badge {
   background: var(--modus-wc-color-base-200);
   border-radius: 4px;
   padding: 2px 6px;
+  max-width: 10.95rem;
   color: var(--modus-wc-color-base-content);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -882,6 +899,206 @@ modus-wc-badge.nf-canvas-project-badge {
   text-overflow: ellipsis;
   white-space: nowrap;
   border: 1px solid #22c55e33;
+}
+
+/* Clamped previews + expandable full-text modal (keep node width stable) */
+.nf-result-slot {
+  margin-top: 3px;
+  min-width: 0;
+}
+
+.nf-expand-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+}
+
+.nf-expand-preview {
+  flex: 1;
+  min-width: 0;
+  max-width: 10.95rem;
+  max-height: 1.35em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  font-size: 10px;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.nf-expand-preview--dense {
+  max-height: 1.35em;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nf-expand-preview--mono {
+  font-family: ui-monospace, monospace;
+  background: var(--modus-wc-color-base-200);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--modus-wc-color-base-content);
+}
+
+.nf-expand-preview--default {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nf-expand-row--default .nf-expand-preview--default {
+  font-family: system-ui, sans-serif;
+}
+
+.nf-expand-row--result .nf-expand-preview,
+.nf-expand-preview--result {
+  color: #4ade80;
+  background: #14532d22;
+  border: 1px solid #22c55e33;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+}
+
+.nf-expand-row--aiSub .nf-expand-preview,
+.nf-expand-preview--aiSub {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.nf-expand-more {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 1;
+  font-size: 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--modus-wc-color-base-300);
+  color: var(--modus-wc-color-base-content);
+}
+
+.nf-expand-row--aiSub .nf-expand-more {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.nf-expand-more:hover {
+  filter: brightness(1.1);
+}
+
+.nf-ai__agent-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* AI sub row stacks expandable instructions under header */
+.nf-ai__sub {
+  flex-wrap: wrap;
+  align-items: flex-start !important;
+  width: 100%;
+}
+
+.react-flow__node > div:first-child {
+  min-width: 0;
+}
+
+.react-flow__node .ai-ux-gradient-frame,
+.react-flow__node .nf-node {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Lightweight full-text overlay (ported from nf-script-modal) */
+.nf-node-text-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.nf-node-text-modal {
+  width: min(560px, 92vw);
+  max-height: min(76vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--modus-wc-color-base-page);
+  border: 1px solid var(--modus-wc-color-base-300);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.nf-node-text-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--modus-wc-color-base-300);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nf-node-text-modal__close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--modus-wc-color-base-200);
+  color: var(--modus-wc-color-base-content);
+}
+
+.nf-node-text-modal--chart {
+  width: min(720px, 94vw);
+  max-height: min(88vh, 760px);
+}
+
+.nf-node-text-modal__chart-body {
+  padding: 16px 20px 20px;
+  min-height: 360px;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nf-chart-icon {
+  display: block;
+}
+
+.nf-node__icon svg.nf-chart-icon {
+  vertical-align: middle;
+}
+
+.nf-node-text-modal__pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--modus-wc-color-base-content);
+  flex: 1;
+  background: var(--modus-wc-color-base-100);
 }
 
 /* ── Script Modal ────────────────────────────────────────────────────────── */

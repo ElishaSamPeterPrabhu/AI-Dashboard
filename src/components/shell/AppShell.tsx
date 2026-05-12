@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, useNavigate, useParams } from "react-router-dom";
+import { Outlet, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ModusWcNavbar,
   ModusWcCard,
@@ -14,12 +14,15 @@ import {
 } from "@trimble-oss/moduswebcomponents-react";
 import { useAppStore } from "@/store/appStore";
 import { badgeColorForProjectId } from "@/utils/projectBadgeColor";
+import { ModusWcTextInputCustomEvent } from "@trimble-oss/moduswebcomponents";
 
 const MOBILE_BP = 768;
 
 export default function AppShell() {
   const navigate = useNavigate();
   const { projectId, workflowId } = useParams();
+  const [searchParams] = useSearchParams();
+  const embedMode = searchParams.get("embed") === "1";
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -40,6 +43,9 @@ export default function AppShell() {
 
   useEffect(() => {
     void fetchProjectsFromApi();
+    // Re-sync every 10 s so MCP-created workflows appear in the sidebar without a manual refresh
+    const t = setInterval(() => void fetchProjectsFromApi(), 10_000);
+    return () => clearInterval(t);
   }, [fetchProjectsFromApi]);
   const mobile = width < MOBILE_BP;
 
@@ -86,6 +92,15 @@ export default function AppShell() {
       return next;
     });
   };
+
+  // Embed mode: just render the canvas with no navbar/sidebar/overlay
+  if (embedMode) {
+    return (
+      <div className="flex flex-col h-full bg-[var(--modus-wc-color-base-page)] overflow-hidden">
+        <Outlet />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-[var(--modus-wc-color-base-page)] overflow-hidden">
@@ -162,7 +177,7 @@ export default function AppShell() {
                 customClass="text-[var(--modus-wc-color-base-content-low-contrast)] m-0 tracking-wider"
               />
               <ModusWcButton
-                size="sm" variant="borderless" color="secondary" shape="square"
+                size="sm" variant="borderless" color="tertiary" shape="square"
                 aria-label="New project"
                 onButtonClick={() => setNewProjectOpen(true)}
               >
@@ -243,7 +258,7 @@ export default function AppShell() {
       {/* ── New Project Modal ─────────────────────────── */}
       {newProjectOpen && (
         <ModusWcModal
-          open
+          show={true}
           headerText="New Project"
           primaryButtonText="Create"
           secondaryButtonText="Cancel"
@@ -257,13 +272,13 @@ export default function AppShell() {
               placeholder="e.g. Product Planning"
               value={newProjectName}
               required
-              onValueChange={(e: CustomEvent<string>) => setNewProjectName(e.detail)}
+              onInputChange={(e) => setNewProjectName(e.target.value)}
             />
             <ModusWcTextInput
               label="Description (optional)"
               placeholder="What is this project for?"
               value={newProjectDesc}
-              onValueChange={(e: CustomEvent<string>) => setNewProjectDesc(e.detail)}
+              onInputChange={(e) => setNewProjectDesc(e.target.value)}
             />
           </div>
         </ModusWcModal>
