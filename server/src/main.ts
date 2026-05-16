@@ -103,6 +103,7 @@ async function refreshToken(log = true): Promise<void> {
 }
 
 import { NestFactory } from "@nestjs/core";
+import { RequestMethod } from "@nestjs/common";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
@@ -138,14 +139,29 @@ async function bootstrap() {
   }, 5 * 60 * 1000); // check every 5 min
 
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix("api");
+  app.setGlobalPrefix("api", {
+    exclude: [{ path: "mcp", method: RequestMethod.POST }],
+  });
+
+  // CORS: allow local dev + any configured production origin
+  const corsOrigins: (string | RegExp)[] = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ];
+  if (process.env.BFF_PUBLIC_URL) {
+    corsOrigins.push(process.env.BFF_PUBLIC_URL.replace(/\/$/, ""));
+  }
+  // Allow Azure Static Web Apps origin pattern
+  corsOrigins.push(/\.azurestaticapps\.net$/);
+
   app.enableCors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: corsOrigins,
     credentials: true,
   });
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port);
   console.log(`API http://localhost:${port}/api`);
+  console.log(`MCP http://localhost:${port}/mcp`);
   console.log(`Trimble agent base : ${process.env.TRIMBLE_AGENT_BASE_URL ?? "(not set)"}`);
   console.log(`Trimble agent key  : ${process.env.TRIMBLE_AGENT_API_KEY ? "✓ set" : "✗ not set"}`);
 }

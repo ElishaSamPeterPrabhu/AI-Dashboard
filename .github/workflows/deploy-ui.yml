@@ -1,0 +1,38 @@
+name: Deploy UI to Azure Static Web Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'vite.config.*'
+      - 'package.json'
+      - '.github/workflows/deploy-ui.yml'
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build and deploy to Static Web Apps
+        uses: azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: '/'          # root of repo
+          output_location: 'dist'    # Vite build output
+          app_build_command: 'npm run build'
+        env:
+          VITE_API_BASE_URL: https://ai-dashboard.azurewebsites.net

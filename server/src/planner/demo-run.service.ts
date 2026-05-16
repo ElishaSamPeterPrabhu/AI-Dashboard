@@ -119,6 +119,12 @@ type AgUiEvent =
   | RunErrorEvent
   | AgUiBase;
 
+interface SubagentStep {
+  agentId: string;
+  event: string;
+  detail?: string;
+}
+
 interface TurnResult {
   threadId?: string;
   runId?: string;
@@ -127,6 +133,7 @@ interface TurnResult {
   errorMessage?: string;
   runFinished: boolean;
   toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }>;
+  subagentSteps: SubagentStep[];
 }
 
 @Injectable()
@@ -172,6 +179,7 @@ export class DemoRunService {
       name: string;
       args: Record<string, unknown>;
     }> = [];
+    const subagentSteps: SubagentStep[] = [];
 
     while (!done) {
       const { value, done: streamDone } = await reader.read();
@@ -242,6 +250,24 @@ export class DemoRunService {
           case "RUN_ERROR":
             errorMessage = (event as RunErrorEvent).message;
             break;
+          case "CUSTOM": {
+            // Handle SUBAGENT_* events relayed from native sub-agent calls
+            const custom = event as AgUiBase & { name?: string; value?: unknown };
+            const name = custom.name ?? "";
+            if (name.startsWith("SUBAGENT_")) {
+              const val = custom.value as { agentId?: string; event?: { type?: string; delta?: string; message?: string } } | undefined;
+              const agentId = val?.agentId ?? "sub-agent";
+              const innerType = val?.event?.type ?? name;
+              const detail =
+                innerType === "TEXT_MESSAGE_CONTENT" || innerType === "TEXT_MESSAGE_CHUNK"
+                  ? (val?.event as { delta?: string } | undefined)?.delta?.slice(0, 120)
+                  : innerType === "RUN_ERROR"
+                    ? (val?.event as { message?: string } | undefined)?.message
+                    : undefined;
+              subagentSteps.push({ agentId, event: innerType, detail });
+            }
+            break;
+          }
         }
       }
     }
@@ -254,19 +280,96 @@ export class DemoRunService {
       }
     }
 
-    return { threadId, runId, text, snapshot, errorMessage, runFinished, toolCalls: completedToolCalls };
+    return { threadId, runId, text, snapshot, errorMessage, runFinished, toolCalls: completedToolCalls, subagentSteps };
   }
 
   /**
-   * Parse strict agent envelope JSON. On failure → synthetic `chat` envelope with raw excerpt.
+   * Best-effort JSON repair for common LLM output issues:
+   * 1. Unescaped newlines / control characters inside string values
+   * 2. Trailing commas before `}` or `]`
+   * 3. Mid-string truncation — strips the dangling incomplete token
+   * 4. Unclosed braces/brackets — closes them to complete the structure
+   */
+  private repairJson(raw: string): string {
+    // Step 1: escape literal control chars inside complete JSON string literals
+    let s = raw.replace(/"(?:[^"\\]|\\.)*"/g, (match) =>
+      match
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t")
+    );
+
+    // Step 2: remove trailing commas before closing braces/brackets
+    s = s.replace(/,\s*([}\]])/g, "$1");
+
+    // Step 3: detect mid-string truncation and strip the dangling incomplete token.
+    // Only '}' and ']' are truly safe cut points — they mark the end of a complete
+    // object or array item. Commas and bare keys are NOT safe (they leave dangling
+    // key-without-value pairs that make the JSON invalid).
+    {
+      let inStr = false;
+      let esc = false;
+      let lastSafeBoundary = 0; // position after the last complete } or ]
+
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (esc) { esc = false; continue; }
+        if (ch === "\\" && inStr) { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === "}" || ch === "]") lastSafeBoundary = i + 1; // include the closing char
+      }
+
+      if (inStr && lastSafeBoundary > 0) {
+        // Truncated mid-string: cut to after the last complete object/array
+        s = s.slice(0, lastSafeBoundary).trimEnd();
+        // Strip any trailing comma that was between the last complete item and the truncated one
+        if (s.endsWith(",")) s = s.slice(0, -1);
+      }
+    }
+
+    // Step 4: close unclosed structures
+    const stack: string[] = [];
+    let inString = false;
+    let escape = false;
+    for (const ch of s) {
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") stack.push("}");
+      else if (ch === "[") stack.push("]");
+      else if (ch === "}" || ch === "]") stack.pop();
+    }
+    s += stack.reverse().join("");
+
+    // Step 5: run trailing-comma strip again now that closing chars exist
+    s = s.replace(/,\s*([}\]])/g, "$1");
+
+    return s;
+  }
+
+  /**
+   * Parse strict agent envelope JSON. On failure → try repairJson, then synthetic `chat` envelope.
    */
   parseEnvelope(text: string): AgentEnvelope {
     let raw = text.trim();
     const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fence?.[1]) raw = fence[1].trim();
 
+    const tryParse = (src: string): Record<string, unknown> | null => {
+      try { return JSON.parse(src) as Record<string, unknown>; } catch { return null; }
+    };
+
+    const parsed = tryParse(raw) ?? (() => {
+      const repaired = this.repairJson(raw);
+      const result = tryParse(repaired);
+      if (result) this.logger.log("parseEnvelope: used repaired JSON");
+      return result;
+    })();
+
     try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (!parsed) throw new Error("JSON parse failed after repair");
       const t = parsed.type;
       const msg = typeof parsed.message === "string" ? parsed.message : "";
       if (t === "chat") {
@@ -298,6 +401,28 @@ export class DemoRunService {
       }
     } catch (e) {
       this.logger.warn(`parseEnvelope fallback: ${(e as Error).message}`);
+    }
+
+    // The agent returned malformed JSON. Try to salvage the human-readable
+    // "message" field via regex so the user sees something useful instead of
+    // a wall of broken JSON.
+    if (raw.trimStart().startsWith("{")) {
+      const msgMatch = raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const typeMatch = raw.match(/"type"\s*:\s*"(\w+)"/);
+      const salvaged = msgMatch?.[1]?.replace(/\\n/g, "\n").replace(/\\"/g, '"');
+      const typeHint = typeMatch?.[1] ?? "response";
+      if (salvaged) {
+        this.logger.warn(`parseEnvelope: salvaged message from malformed ${typeHint} JSON`);
+        return {
+          type: "chat",
+          message: `${salvaged}\n\n_(JSON was malformed — canvas not built. Please try sending your request again.)_`,
+        };
+      }
+      // No message salvageable — show a clean error rather than raw JSON
+      return {
+        type: "chat",
+        message: "_(The agent returned a malformed response. Please try again.)_",
+      };
     }
 
     const excerpt =
@@ -582,6 +707,17 @@ export class DemoRunService {
     const agentText = tr.text.trim();
     this.logger.log(`[demo] agent reply:\n${agentText.slice(0, 4000)}`);
 
+    // Surface native sub-agent (Workflow_Builder) events as steps
+    for (const s of tr.subagentSteps) {
+      if (s.event === "RUN_STARTED") {
+        steps.push({ label: "Workflow_Builder: started", detail: `agent ${s.agentId}` });
+      } else if (s.event === "RUN_FINISHED") {
+        steps.push({ label: "Workflow_Builder: finished", detail: `agent ${s.agentId}` });
+      } else if (s.event === "RUN_ERROR") {
+        steps.push({ label: "Workflow_Builder: error", detail: s.detail ?? s.agentId });
+      }
+    }
+
     const envelope = this.parseEnvelope(agentText);
     let lastWorkflowId: string | null = input.workflowId;
     let envelopeType: DemoRunResponse["envelopeType"] = envelope.type;
@@ -777,6 +913,7 @@ function dummyTurnResult(text: string): TurnResult {
     text,
     runFinished: true,
     toolCalls: [],
+    subagentSteps: [],
   };
 }
 
