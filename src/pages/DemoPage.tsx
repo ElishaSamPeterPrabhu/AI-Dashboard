@@ -518,6 +518,25 @@ export default function DemoPage() {
               Reload canvas
             </button>
           ) : null}
+          {workflowId ? (
+            <a
+              href={`http://localhost:3000/canvas/${workflowId}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                padding: "6px 12px",
+                background: "#1a2235",
+                border: "1px solid #475569",
+                borderRadius: 8,
+                color: "#94a3b8",
+                fontSize: 12,
+                textDecoration: "none",
+                cursor: "pointer",
+              }}
+            >
+              MCP canvas ↗
+            </a>
+          ) : null}
         </div>
         {workflowId ? (
           <iframe

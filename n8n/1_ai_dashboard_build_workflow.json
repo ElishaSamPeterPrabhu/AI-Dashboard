@@ -1,0 +1,65 @@
+{
+  "name": "ai_dashboard_build_workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "prompt" },
+            { "name": "threadId" },
+            { "name": "workflowId" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-640, 96],
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.AI_DASHBOARD_BFF_URL }}/api/demo/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "values": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  prompt: $json.prompt,\n  threadId: $json.threadId || null,\n  runId: null,\n  workflowId: $json.workflowId || null\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-400, 96],
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Call AI Dashboard BFF"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst bffUrl = $vars.AI_DASHBOARD_BFF_URL || 'http://localhost:3000';\nreturn [{\n  json: {\n    result: d.finalText || d.error || 'Workflow built.',\n    workflowId: d.workflowId || null,\n    canvasUrl: d.workflowId ? `${bffUrl}/canvas/${d.workflowId}` : null,\n    threadId: d.threadId || null,\n    envelopeType: d.envelopeType || null,\n    steps: (d.steps || []).map(s => s.label).join(' → ')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-160, 96],
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Format Response"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [[{ "node": "Call AI Dashboard BFF", "type": "main", "index": 0 }]]
+    },
+    "Call AI Dashboard BFF": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "instanceId": "ai-dashboard"
+  }
+}

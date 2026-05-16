@@ -140,7 +140,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix("api", {
-    exclude: [{ path: "mcp", method: RequestMethod.POST }],
+    exclude: [
+      { path: "mcp", method: RequestMethod.POST },
+      { path: "canvas/:workflowId", method: RequestMethod.GET },
+    ],
   });
 
   // CORS: allow local dev + any configured production origin

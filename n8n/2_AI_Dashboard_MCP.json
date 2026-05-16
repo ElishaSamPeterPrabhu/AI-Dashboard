@@ -1,0 +1,57 @@
+{
+  "name": "AI Dashboard MCP",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "ai-dashboard-mcp"
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "b2c3d4e5-0002-0002-0002-000000000001",
+      "name": "AIDashboardMCP",
+      "webhookId": "ai-dashboard-mcp-webhook-001"
+    },
+    {
+      "parameters": {
+        "description": "**Purpose**: Build and execute a visual AI workflow from a natural language prompt.\n\nUse when the user wants to:\n- Model or estimate anything (costs, capacity, risks, schedules)\n- Plan a sprint, project, or resource allocation\n- Run a financial or operational simulation\n- Visualise any calculation or decision process as a graph\n\n**Inputs**:\n- `prompt` (required): Natural language description. Include any known values (team size, rates, dates, domain context from the current project).\n- `threadId` (optional): Pass back the previous threadId to continue a multi-turn conversation.\n- `workflowId` (optional): Pass back to edit an existing workflow.\n\n**Output**:\n- `result`: Human-readable summary from the AI Planner\n- `workflowId`: ID of the built/updated workflow\n- `canvasUrl`: Direct link to the interactive canvas editor — share this with the user\n- `threadId`: Pass this back in the next call to continue the conversation\n\n**Example prompts**:\n- `\"Sprint plan for team of 8, velocity 42, daily rate $200, 10-day sprint\"`\n- `\"Model construction material costs for Phase 1 of Highway Alpha\"`\n- `\"Compare frontend vs backend effort — frontend: 5 devs, backend: 3 devs\"`\n- `\"Risk-adjusted cost estimate: $50k base, 15% buffer, 10% risk factor\"`",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SUBWORKFLOW_ID",
+          "mode": "list",
+          "cachedResultName": "ai_dashboard_build_workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "prompt":     "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('prompt', `Natural language description of what to model or plan`, 'string') }}",
+            "threadId":   "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('threadId', `Previous threadId to continue conversation, empty string if new`, 'string') }}",
+            "workflowId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('workflowId', `Existing workflowId to edit, empty string for new workflow`, 'string') }}"
+          },
+          "schema": [
+            { "id": "prompt",     "displayName": "prompt",     "type": "string", "required": true,  "display": true, "canBeUsedToMatch": false },
+            { "id": "threadId",   "displayName": "threadId",   "type": "string", "required": false, "display": true, "canBeUsedToMatch": false },
+            { "id": "workflowId", "displayName": "workflowId", "type": "string", "required": false, "display": true, "canBeUsedToMatch": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [0, 224],
+      "id": "b2c3d4e5-0002-0002-0002-000000000002",
+      "name": "build_workflow"
+    }
+  ],
+  "connections": {
+    "build_workflow": {
+      "ai_tool": [[{ "node": "AIDashboardMCP", "type": "ai_tool", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "instanceId": "ai-dashboard"
+  }
+}

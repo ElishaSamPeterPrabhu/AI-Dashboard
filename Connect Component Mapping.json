@@ -1,0 +1,288 @@
+{
+  "name": "Connect Component Mapping",
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.value }}",
+                    "rightValue": "mapping",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "eaf690ba-59ff-48a2-a7b4-96b8e70b9a0a"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "99519397-2fda-4976-a910-f4f4c986a005",
+                    "leftValue": "={{ $json.value }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -496,
+        96
+      ],
+      "id": "261c662a-d749-4f83-90c3-f622436ce7da",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "__rl": true,
+          "value": "ElishaSamPeterPrabhu",
+          "mode": "list",
+          "cachedResultName": "ElishaSamPeterPrabhu",
+          "cachedResultUrl": "https://github.com/ElishaSamPeterPrabhu"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "modus-code-generator-migration",
+          "mode": "list",
+          "cachedResultName": "modus-code-generator-migration",
+          "cachedResultUrl": "https://github.com/ElishaSamPeterPrabhu/modus-code-generator-migration"
+        },
+        "filePath": "connect_migration/component_analysis/component_mappings.json",
+        "additionalParameters": {}
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        -272,
+        0
+      ],
+      "id": "61383c7c-918c-4f25-8a9f-60ea6f6805be",
+      "name": "Get Component Mappings",
+      "webhookId": "f1518444-f175-4553-ba70-4674ff6f938c",
+      "credentials": {
+        "githubApi": {
+          "id": "YHagTPObaWpDO1O1",
+          "name": "GitHub account 21"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        0
+      ],
+      "id": "9ef0b6bc-8cf6-485d-9a50-9441d1267f98",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "value"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        96
+      ],
+      "id": "f9b7bbb7-82a9-470b-9102-c76636108118",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "__rl": true,
+          "value": "ElishaSamPeterPrabhu",
+          "mode": "list",
+          "cachedResultName": "ElishaSamPeterPrabhu",
+          "cachedResultUrl": "https://github.com/ElishaSamPeterPrabhu"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "modus-code-generator-migration",
+          "mode": "list",
+          "cachedResultName": "modus-code-generator-migration",
+          "cachedResultUrl": "https://github.com/ElishaSamPeterPrabhu/modus-code-generator-migration"
+        },
+        "filePath": "connect_migration/component_analysis/connect_ui_to_modus_mapping.json",
+        "additionalParameters": {}
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        -272,
+        192
+      ],
+      "id": "480b58ee-3b3f-408d-be16-2d6b9ee10e20",
+      "name": "Get Component Mapping Data",
+      "webhookId": "f1518444-f175-4553-ba70-4674ff6f938c",
+      "credentials": {
+        "githubApi": {
+          "id": "mHISQCA9z7yFe6Cy",
+          "name": "GitHub account 70"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "destinationKey": "=comp_data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        192
+      ],
+      "id": "4ba07694-f13f-4fb4-ac11-4b15e24f3152",
+      "name": "Extract from Component Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Get Connect Component Details - n8n Code Node\n * \n * Extracts specific component data from the loaded mapping JSON\n * \n * n8n usage:\n *   - $input.first().json.comp_data: The component name to extract (e.g., \"Button\")\n *   - $('Get Component Mapping Data').first().json.value: The entire mapping JSON (already parsed object)\n * \n * Returns: The specific component's data\n */\n\n// Get the component name from input\nconst componentName = $('Get Component Mapping Data').first().json.value;\n\n// Get the mapping data from previous node\n// It should already be a parsed object, not a string\nconst mappingData = $input.first().json.comp_data;\n\n// If mappingData is a string, parse it\nconst data = typeof mappingData === 'string' ? JSON.parse(mappingData) : mappingData;\n\n// Extract and return that component's data\nif (data && data.hasOwnProperty(componentName)) {\n  return data[componentName];\n} else {\n  return {\n    error: `Component '${componentName}' not found`,\n    componentName: componentName,\n    mappingDataType: typeof data,\n    hint: \"Check if mapping data is loaded correctly\"\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        192
+      ],
+      "id": "5fb45681-18be-4938-96d8-b99a06dcaae6",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "value": "mapping"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Component Mappings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Component Mapping Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Component Mappings": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Component Mapping Data": {
+      "main": [
+        [
+          {
+            "node": "Extract from Component Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from Component Data": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5e11e5d0-168d-43ab-8edd-f992e6230c9e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9864951ea4472b9d0ea716c66bb2527efb446aa6309ab9f74077ab1db432402b"
+  },
+  "id": "ys587wa3GAHwCfdZ",
+  "tags": []
+}

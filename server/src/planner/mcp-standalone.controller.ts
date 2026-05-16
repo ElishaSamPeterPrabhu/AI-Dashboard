@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
+  Param,
   Post,
   Req,
   Res,
@@ -141,5 +143,39 @@ export class McpStandaloneController {
       res.setHeader("Content-Type", "application/json");
       res.json(envelope);
     }
+  }
+
+  /**
+   * GET /canvas/:workflowId
+   * Serves the canvas MCP App HTML directly in a browser for local testing.
+   * Open http://localhost:3000/canvas/<workflowId> to preview the workflow viewer.
+   */
+  @Get("canvas/:workflowId")
+  serveCanvas(@Param("workflowId") workflowId: string, @Res() res: Response): void {
+    const bffOrigin = (process.env.BFF_PUBLIC_URL ?? "").replace(/\/$/, "") || "http://localhost:3000";
+    const uiOrigin = (process.env.UI_PUBLIC_URL ?? "").replace(/\/$/, "") || "http://localhost:5173";
+    const safeId = workflowId.replace(/[^a-zA-Z0-9_-]/g, "");
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canvas — ${safeId}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f172a;overflow:hidden}
+  iframe{width:100vw;height:100vh;border:none}
+</style>
+</head>
+<body>
+<iframe src="${uiOrigin}/projects/p1/workflows/${safeId}?embed=1"
+  allow="clipboard-write" title="Workflow Canvas"></iframe>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+    void bffOrigin; // suppress unused warning
   }
 }

@@ -1,0 +1,198 @@
+{
+  "name": "Connect Migration MCP",
+  "nodes": [
+    {
+      "parameters": {
+        "description": "**Purpose**: Returns workflow documentation paths for migration phases\n\n**Input**: Process/workflow name\n- `\"analyze\"` - Get analyze_connect.md path\n- `\"migrate\"` - Get migrate_connect.md path\n- `\"verify\"` - Get verify_connect.md path\n- `\"log\"` - Get log_connect.md path\n- `\"workflow\"` - Get workflow_connect.md path\n\n**Input Options**:\n- `\"mapping\"` - Get bidirectional component mapping\n- `\"analyze\"` - Get analyze_connect.md filename\n- `\"migrate\"` - Get migrate_connect.md filename\n- `\"verify\"` - Get verify_connect.md filename\n- `\"log\"` - Get log_connect.md filename\n- `\"workflow\"` - Get workflow_connect.md filename\n\n**Output**: Documentation filename (e.g., \"analyze_connect.md\")\n\n**Use When**:\n- **Need migration guidance** for a specific phase\n- **Starting migration** - get workflow doc\n- **Looking for examples** in documentation",
+        "workflowId": {
+          "__rl": true,
+          "value": "TtKucr5JIOmdjmdM",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/TtKucr5JIOmdjmdM",
+          "cachedResultName": "get_connect_migration_guidance"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "docs": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('docs', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "docs",
+              "displayName": "docs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        16,
+        224
+      ],
+      "id": "0d973527-7c13-47a9-b7ea-67f5d9b9221d",
+      "name": "get_workflow_documentation"
+    },
+    {
+      "parameters": {
+        "description": "**Purpose**: Get component mappings (all components) OR detailed migration info (specific component)\n\n**Input**: \n- `\"mapping\"` - Get all component mappings (bidirectional)\n- Component name (e.g., \"Button\", \"Spinner\", \"ProgressWidget\") - Get that component's detailed migration data\n\n**Output**:\n\n### If input is \"mapping\"\nReturns entire `component_mappings.json` file:\n```json\n{\n  \"connect_to_modus\": {\n    \"Button\": \"modus-wc-button\",\n    \"Spinner\": \"modus-wc-loader\",\n    \"Empty\": \"not available\",\n    \"ProgressWidget\": \"not available\",\n    ... (all 36 components)\n  },\n  \"modus_to_connect\": {\n    \"modus-wc-button\": [\"ActionButton\", \"Button\", \"FabButton\", \"IconButton\"],\n    \"modus-wc-loader\": \"Spinner\",\n    ... (all Modus components)\n  }\n}\n```\n\n### If input is a component name\n\n**Note**: Not all components have a direct Modus equivalent. Check the `modus_equivalent` field:\n- `\"modus-wc-*\"` = Direct Modus component available\n- `\"not available\"` = No direct equivalent, see `migration_type` for how it was migrated\n\n#### Example: Component WITH direct mapping (e.g., \"Button\")\n```json\n{\n  \"connect_component\": \"Button\",\n  \"modus_equivalent\": \"modus-wc-button\",\n  \"migration_type\": \"direct_with_icon_slot\",\n  \"property_mappings\": {\n    \"content\": \"Rendered as <span> child\",\n    \"type\": \"variant (solid→filled, hollow→borderless, outline→outlined)\",\n    ...\n  },\n  \"modus_components_used\": [\"modus-wc-button\", \"Icon (modus-wc-icon)\"]\n}\n```\n\n#### Example: Component WITHOUT direct mapping (e.g., \"ProgressWidget\")\n```json\n{\n  \"connect_component\": \"ProgressWidget\",\n  \"modus_equivalent\": \"not available\",\n  \"migration_type\": \"custom_implementation_with_modus_components\",\n  \"migration_notes\": \"No Modus equivalent. Custom implementation using native HTML elements with ProgressBar component for the progress indicator...\",\n  \"property_mappings\": {\n    \"title\": \"Rendered in <h4> inside header\",\n    \"progress\": \"Passed to ProgressBar component\",\n    ...\n  },\n  \"modus_components_used\": [\"ProgressBar (which uses modus-wc-progress internally)\"],\n  \"actual_migration_pattern\": \"Custom div structure with header/section/footer, uses ProgressBar component\"\n}\n```\n\n### Migration Types Reference\n| Type | Meaning |\n|------|---------|\n| `direct` | 1:1 mapping to Modus component |\n| `direct_with_slots` | Uses Modus component with slot content |\n| `direct_with_wrapper` | Modus component wrapped in custom div |\n| `custom_implementation_with_modus_components` | No Modus equivalent, but uses Modus components internally |\n| `custom_css_required` | Uses Modus component but needs custom CSS |\n| `native_html` | Uses standard HTML elements |\n| `use_modal` | No direct equivalent, use modus-wc-modal |\n\n**Use When**:\n- **Check all mappings**: Input \"mapping\" to see what's available\n- **Get specific component**: Input component name for detailed migration info\n- **Components without Modus equivalent**: Check `modus_components_used` to see what Modus components are used internally\n- **Migration guidance**: Check `migration_notes` and `actual_migration_pattern` for implementation details",
+        "workflowId": {
+          "__rl": true,
+          "value": "ys587wa3GAHwCfdZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ys587wa3GAHwCfdZ",
+          "cachedResultName": "Connect Component Mapping"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('value', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "value"
+          ],
+          "schema": [
+            {
+              "id": "value",
+              "displayName": "value",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        144,
+        224
+      ],
+      "id": "c0ee285c-5668-422c-be84-869d3f1a4078",
+      "name": "get_connect_component_mapping"
+    },
+    {
+      "parameters": {
+        "description": "**Purpose**: Get Modus component details (separate Modus MCP server)\n\n**Input Parameter**: `value` (generic parameter with switch logic)\n\n**Input Options**:\n1. `\"_all_components\"` - Get list of all available Modus components\n2. Component name (e.g., \"modus-wc-button\") - Get that component's documentation\n\n**Output**:\n\n### If input is \"_all_components\"\nReturns list of all 46 Modus components:\n```json\n{\n  \"total\": 46,\n  \"components\": [\n    \"modus-wc-accordion\",\n    \"modus-wc-alert\",\n    \"modus-wc-button\",\n    ...\n  ]\n}\n```\n\n### If input is a component name\nReturns that component's documentation:\n```json\n{\n  \"tag\": \"modus-wc-button\",\n  \"properties\": [\n    {\"name\": \"color\", \"type\": \"string\", \"default\": \"'primary'\"},\n    {\"name\": \"variant\", \"type\": \"'filled'|'outlined'|'borderless'\"},\n    {\"name\": \"size\", \"type\": \"'xs'|'sm'|'md'|'lg'\"},\n    ...\n  ],\n  \"events\": [\n    {\"name\": \"buttonClick\", \"detail\": \"MouseEvent\"}\n  ],\n  \"slots\": [\n    {\"name\": \"default\", \"description\": \"Slot for button content\"}\n  ],\n  \"examples\": {...}\n}\n```\n\n**Use When**:\n- **Get all components**: Input \"_all_components\" to see what's available\n- **Get component details**: Input component name for properties, events, slots\n- **Need API reference**: Get complete Modus component documentation\n- **Want usage examples**: Get code examples and patterns\n\n**Note**: Use `\"_all_components\"` to get the complete list of all 46 Modus components.",
+        "workflowId": {
+          "__rl": true,
+          "value": "F4aSxTlwpFnrVEat",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/F4aSxTlwpFnrVEat",
+          "cachedResultName": "get_modus_component_details"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('value', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "value",
+              "displayName": "value",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -192,
+        224
+      ],
+      "id": "55a77a66-7e7b-4bb2-bfb0-c7c5fbeb4fd9",
+      "name": "get_modus_component_details"
+    },
+    {
+      "parameters": {
+        "path": "modus-connect-migration-mcp"
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -16
+      ],
+      "id": "46b3fbf3-5c3e-4fff-ae04-1e943f642439",
+      "name": "ConnectModusMCP",
+      "webhookId": "447e9f06-c168-43ae-8ed7-87279345d258"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "get_workflow_documentation": {
+      "ai_tool": [
+        [
+          {
+            "node": "ConnectModusMCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_connect_component_mapping": {
+      "ai_tool": [
+        [
+          {
+            "node": "ConnectModusMCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_modus_component_details": {
+      "ai_tool": [
+        [
+          {
+            "node": "ConnectModusMCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "48cbb0a8-619c-45a5-bdb6-8c75ee374066",
+  "meta": {
+    "instanceId": "9864951ea4472b9d0ea716c66bb2527efb446aa6309ab9f74077ab1db432402b"
+  },
+  "id": "p1gXLljZtarLXjDU",
+  "tags": [
+    {
+      "updatedAt": "2025-12-08T07:25:10.284Z",
+      "createdAt": "2025-12-08T07:25:10.284Z",
+      "id": "fcyEkkKVA0KclRg9",
+      "name": "MigrationMCP"
+    }
+  ]
+}
