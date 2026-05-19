@@ -34,10 +34,20 @@ html, body, #root {
   }
 }
 
-/* Canvas toolbar: cap project name badge width */
+/* Canvas toolbar: cap project name badge width and force truncation */
 modus-wc-badge.nf-canvas-project-badge {
-  max-width: 140px;
+  max-width: 120px;
   min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+modus-wc-badge.nf-canvas-project-badge::part(badge),
+modus-wc-badge.nf-canvas-project-badge::part(label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
 }
 
 /* ─── AI gradient frame (from modus-blueprint) ──────────── */

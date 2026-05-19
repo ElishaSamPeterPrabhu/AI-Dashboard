@@ -292,10 +292,10 @@ export default function CanvasPage() {
               <ModusWcBadge
                 color={badgeColorForProjectId(project.id)}
                 size="sm"
-                customClass="flex-shrink-0 max-w-[140px] nf-canvas-project-badge"
+                customClass="nf-canvas-project-badge"
                 title={project.name}
               >
-                {project.name.length > 22 ? `${project.name.slice(0, 22)}…` : project.name}
+                {project.name.length > 18 ? `${project.name.slice(0, 18)}…` : project.name}
               </ModusWcBadge>
             )}
           </div>
