@@ -131,9 +131,6 @@ MCP URL for Assist: **`https://<your-eb-host>/mcp`**
    | Name | Value |
    |------|--------|
    | `VITE_API_BASE` | `http://<your-eb-host>` (same as BFF, **no** trailing slash; use your Elastic Beanstalk domain) |
-   | `TRIMBLE_NPM_TOKEN` | Trimble **Artifactory** npm token (fixes build `E401` on `npm ci`) |
-
-   Same token as in your local `~/.npmrc` for `@trimble-agentic-external-npm-local` (see `.npmrc.example`). Mark as **secret** in Amplify if available.
 
 6. **Save and deploy**. Note the app URL, e.g. `https://main.d1234abcd.amplifyapp.com`.
 
@@ -192,7 +189,6 @@ To use different names, edit `EB_APPLICATION_NAME` and `EB_ENVIRONMENT_NAME` in 
 | 403 from agent | Set `DEMO_PLANNER_AGENT_ID` + ensure JWT or `CLIENT_ID`/`CLIENT_SECRET` can run that agent. |
 | MCP works but canvas blank in Assist | Set `UI_PUBLIC_URL` on EB to Amplify URL; redeploy EB. |
 | CORS errors from UI | `UI_PUBLIC_URL` and `BFF_PUBLIC_URL` set; Amplify domain matches `*.amplifyapp.com` in CORS. |
-| Amplify `npm ci` **E401** | Add `TRIMBLE_NPM_TOKEN` (Artifactory); push latest `amplify.yml` from `feature/mcp-apps-canvas`. |
 
 ---
 

@@ -1,5 +1,0 @@
-# Copy to project .npmrc for local use, or set TRIMBLE_NPM_TOKEN in Amplify (see aws/README.md).
-# Generate token: Trimble Artifactory → your profile → Generate API Key / npm token
-
-@trimble-agentic-external-npm-local:registry=https://artifactory.trimble.tools/artifactory/api/npm/trimble-agentic-external-npm-local/
-//artifactory.trimble.tools/artifactory/api/npm/trimble-agentic-external-npm-local/:_authToken=${TRIMBLE_NPM_TOKEN}

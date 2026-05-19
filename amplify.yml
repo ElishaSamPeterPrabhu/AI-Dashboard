@@ -3,14 +3,6 @@ frontend:
   phases:
     preBuild:
       commands:
-        # Private Trimble package: @trimble-agentic-external-npm-local/* (Artifactory)
-        - |
-          if [ -z "${TRIMBLE_NPM_TOKEN:-}" ]; then
-            echo "ERROR: Set TRIMBLE_NPM_TOKEN in Amplify → Environment variables (Artifactory npm token)."
-            exit 1
-          fi
-          echo "@trimble-agentic-external-npm-local:registry=https://artifactory.trimble.tools/artifactory/api/npm/trimble-agentic-external-npm-local/" >> .npmrc
-          echo "//artifactory.trimble.tools/artifactory/api/npm/trimble-agentic-external-npm-local/:_authToken=${TRIMBLE_NPM_TOKEN}" >> .npmrc
         - npm ci
     build:
       commands:

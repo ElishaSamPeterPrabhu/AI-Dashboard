@@ -26,7 +26,7 @@ export class AppController {
   }
 
   /**
-   * Same-origin token proxy for the Trimble Assist embed (`AgenticFullChat` / iframe SDK).
+   * Expose Trimble API token for optional UI tooling (e.g. local dev).
    * GET /api/auth/token-for-ui
    */
   @Get("auth/token-for-ui")
