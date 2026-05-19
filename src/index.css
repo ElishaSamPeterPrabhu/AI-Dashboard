@@ -37,12 +37,8 @@ html, body, #root {
 /* Canvas toolbar: keep project badge on one line and cap width.
    modus-wc-badge renders no shadow DOM — customClass lands on the inner span.
    Target: modus-wc-badge > span.modus-wc-badge.nf-canvas-project-badge */
-modus-wc-badge .modus-wc-badge.nf-canvas-project-badge {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap !important;
-  display: inline-block;
+modus-wc-badge > span {
+  white-space: nowrap;
 }
 
 /* ─── AI gradient frame (from modus-blueprint) ──────────── */
