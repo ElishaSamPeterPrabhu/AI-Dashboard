@@ -10,7 +10,7 @@
     "dev": "vite",
     "dev:server": "npm run start:dev -w ai-dashboard-server",
     "dev:all": "concurrently -n ui,api -c blue,green \"npm run dev\" \"npm run dev:server\"",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:ai": "node scripts/test-ai-bff.mjs",
