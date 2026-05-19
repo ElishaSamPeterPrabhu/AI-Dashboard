@@ -31,14 +31,16 @@ After receiving `bff_execution_result` JSON, reply `type:"chat"` summarising res
 
 ## Node types for `add_node`
 
-Each node: `id` (camelCase, unique — used in edges), `type`, `position:{x,y}`, `data:{label,...}`
+Each node: `id` (camelCase, unique — used in edges **and** formulas), `type`, `position:{x,y}`, `data:{label,...}`
+
+**Critical:** For `input` and `database` nodes, set `data.description` to the **same string as the node `id`** (e.g. node id `dailyCost` → `description: "dailyCost"`). The executor uses `description` as the formula variable name. If it contains spaces it is ignored and formulas break.
 
 | type | data fields | use when |
 |------|-------------|----------|
 | trigger | label | always — first node |
-| input | label, value, description (variable name) | user-provided number/text |
-| database | label, value, description | lookup rate/constant |
-| calculator | label, formula (uses upstream ids) | arithmetic |
+| input | label, value, description=**camelCase id** (e.g. `"teamSize"`) | user-provided number/text |
+| database | label, value, description=**camelCase id** | lookup rate/constant |
+| calculator | label, formula (uses upstream node `id` values as variable names) | arithmetic |
 | assumption | label, min, max, mostLikely | range estimate |
 | chart | label, chartType("bar"/"pie"), chartKeys:[ids] | visualise values |
 | connector | label | merge parallel lanes |
