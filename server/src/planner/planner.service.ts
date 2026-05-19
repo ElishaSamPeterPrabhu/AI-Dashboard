@@ -413,6 +413,7 @@ export class PlannerService {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getCanvasAppHtml(_bffOrigin = "http://localhost:3000"): string {
     const uiOrigin = (process.env.UI_PUBLIC_URL ?? "").replace(/\/$/, "") || "http://localhost:5173";
+    const bffOrigin = (process.env.BFF_PUBLIC_URL ?? "").replace(/\/$/, "") || "http://localhost:3000";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -438,15 +439,20 @@ export class PlannerService {
 
 <script>
 const UI = '${uiOrigin}';
+const BFF = '${bffOrigin}';
 const PROJECT_ID = 'p1';
+let loaded = false;
 
 function loadWorkflow(workflowId) {
+  if (loaded) return;
+  loaded = true;
   const frame = document.getElementById('canvas-frame');
   frame.src = UI + '/projects/' + PROJECT_ID + '/workflows/' + encodeURIComponent(workflowId) + '?embed=1';
   frame.style.display = 'block';
   document.getElementById('loading').style.display = 'none';
 }
 
+// Primary: wait for Assist to send ui/initialize with workflowId
 window.addEventListener('message', function(event) {
   const msg = event.data;
   if (!msg || typeof msg !== 'object') return;
@@ -456,13 +462,23 @@ window.addEventListener('message', function(event) {
       try {
         const p = JSON.parse(content);
         const wfId = p.workflowId || p.canvas?.workflowId;
-        if (wfId) { loadWorkflow(wfId); }
+        if (wfId) { loadWorkflow(wfId); return; }
       } catch {}
     }
     const src = event.source;
     if (src) src.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*');
   }
 });
+
+// Fallback: if Assist does not send ui/initialize within 3s, load the
+// most recently executed workflow from the BFF store.
+setTimeout(function() {
+  if (loaded) return;
+  fetch(BFF + '/api/latest-workflow')
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d && d.workflowId) loadWorkflow(d.workflowId); })
+    .catch(function() {});
+}, 3000);
 
 window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*');
 </script>

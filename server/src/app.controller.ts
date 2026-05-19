@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Logger, Patch } from "@nestjs/common";
+import { StoreService } from "./store/store.service";
 
 @Controller()
 export class AppController {
   private readonly logger = new Logger(AppController.name);
+
+  constructor(private readonly store: StoreService) {}
 
   @Get("health")
   health() {
@@ -23,6 +26,16 @@ export class AppController {
         }
       })(),
     };
+  }
+
+  /**
+   * Returns the most recently touched workflow — used by the MCP App HTML as a
+   * fallback when Assist does not yet send the ui/initialize postMessage.
+   * GET /api/latest-workflow
+   */
+  @Get("latest-workflow")
+  latestWorkflow() {
+    return this.store.getLatestWorkflow() ?? { workflowId: null, projectId: null };
   }
 
   /**

@@ -132,6 +132,21 @@ export class StoreService {
     if (wf) wf.updatedAt = new Date().toISOString();
   }
 
+  /** Return the most recently touched workflow across all projects (for MCP App fallback). */
+  getLatestWorkflow(): { workflowId: string; projectId: string } | null {
+    let latest: WorkflowDto | null = null;
+    let latestProjectId = "";
+    for (const p of this.projects) {
+      for (const wf of p.workflows) {
+        if (!latest || wf.updatedAt > latest.updatedAt) {
+          latest = wf;
+          latestProjectId = p.id;
+        }
+      }
+    }
+    return latest ? { workflowId: latest.id, projectId: latestProjectId } : null;
+  }
+
   getCanvas(workflowId: string): CanvasStateDto {
     return this.canvases.get(workflowId) ?? { nodes: [], edges: [] };
   }
