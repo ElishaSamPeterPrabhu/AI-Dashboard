@@ -318,10 +318,18 @@ export class PlannerService {
         } else {
           const cur = nodes.find((x) => x.id === n.id) ?? n;
           const d = cur.data ?? {};
-          const result =
+          let result: unknown =
             cur.type === "input"
               ? (d.value ?? d.executionResult)
               : d.executionResult;
+
+          // output nodes: pull first upstream value when no explicit result is set
+          if (result == null && cur.type === "output") {
+            const upstreamCtx = assembleInputContext(n.id, nodes, edges);
+            const upstreamValues = Object.values(upstreamCtx).filter((v) => v != null);
+            if (upstreamValues.length > 0) result = upstreamValues[upstreamValues.length - 1];
+          }
+
           nodes = patchNodesData(nodes, [n.id], {
             executionState: "done",
             ...(result != null ? { _result: result } : {}),
