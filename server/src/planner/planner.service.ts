@@ -414,6 +414,10 @@ export class PlannerService {
   getCanvasAppHtml(_bffOrigin = "http://localhost:3000"): string {
     const uiOrigin = (process.env.UI_PUBLIC_URL ?? "").replace(/\/$/, "") || "http://localhost:5173";
     const bffOrigin = (process.env.BFF_PUBLIC_URL ?? "").replace(/\/$/, "") || "http://localhost:3000";
+    // Embed the latest workflowId directly — avoids any async fetch from the iframe
+    // (which would be blocked as mixed content when Assist is HTTPS but BFF is HTTP).
+    const latest = this.store.getLatestWorkflow();
+    const preloadWorkflowId = latest?.workflowId ?? "";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -439,12 +443,12 @@ export class PlannerService {
 
 <script>
 const UI = '${uiOrigin}';
-const BFF = '${bffOrigin}';
 const PROJECT_ID = 'p1';
+const PRELOAD_ID = '${preloadWorkflowId}';
 let loaded = false;
 
 function loadWorkflow(workflowId) {
-  if (loaded) return;
+  if (loaded || !workflowId) return;
   loaded = true;
   const frame = document.getElementById('canvas-frame');
   frame.src = UI + '/projects/' + PROJECT_ID + '/workflows/' + encodeURIComponent(workflowId) + '?embed=1';
@@ -452,7 +456,7 @@ function loadWorkflow(workflowId) {
   document.getElementById('loading').style.display = 'none';
 }
 
-// Primary: wait for Assist to send ui/initialize with workflowId
+// Primary: Assist sends ui/initialize with the tool result containing workflowId
 window.addEventListener('message', function(event) {
   const msg = event.data;
   if (!msg || typeof msg !== 'object') return;
@@ -470,15 +474,11 @@ window.addEventListener('message', function(event) {
   }
 });
 
-// Fallback: if Assist does not send ui/initialize within 3s, load the
-// most recently executed workflow from the BFF store.
-setTimeout(function() {
-  if (loaded) return;
-  fetch(BFF + '/api/latest-workflow')
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (d && d.workflowId) loadWorkflow(d.workflowId); })
-    .catch(function() {});
-}, 3000);
+// Fallback: BFF embeds the latest workflowId at HTML-serve-time (no fetch needed).
+// This fires immediately if Assist has not yet implemented ui/initialize.
+if (PRELOAD_ID) {
+  setTimeout(function() { loadWorkflow(PRELOAD_ID); }, 1500);
+}
 
 window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*');
 </script>
