@@ -276,8 +276,8 @@ export default function CanvasPage() {
       {/* ── Canvas area ──────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* Top toolbar: name left | toggle centre | right slot */}
-        <div className="relative flex items-center px-4 py-2 border-b border-[var(--modus-wc-color-base-300)] flex-shrink-0 bg-[var(--modus-wc-color-base-page)]" style={{ minHeight: 44 }}>
+        {/* Top toolbar: name left | right: tabs + load button */}
+        <div className="flex items-center px-4 py-2 border-b border-[var(--modus-wc-color-base-300)] flex-shrink-0 bg-[var(--modus-wc-color-base-page)] gap-3" style={{ minHeight: 44 }}>
           {/* Left: workflow name + project badge */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <ModusWcIcon name="schema" size="sm" decorative customClass="text-[var(--modus-wc-color-primary)] flex-shrink-0" />
@@ -292,7 +292,6 @@ export default function CanvasPage() {
               <ModusWcBadge
                 color={badgeColorForProjectId(project.id)}
                 size="sm"
-      
                 title={project.name}
               >
                 {project.name.length > 18 ? `${project.name.slice(0, 18)}…` : project.name}
@@ -300,8 +299,8 @@ export default function CanvasPage() {
             )}
           </div>
 
-          {/* Centre: Plan / Execute (modus-wc-tabs) */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+          {/* Right: Plan / Execute tabs + optional load button + execute badge */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <ModusWcTabs
               aria-label="Workflow mode"
               size="sm"
@@ -310,10 +309,6 @@ export default function CanvasPage() {
               tabs={workflowModeTabs}
               onTabChange={onWorkflowModeTabChange}
             />
-          </div>
-
-          {/* Right slot: empty canvas helper + execute badge */}
-          <div className="flex items-center gap-2 flex-1 justify-end">
             {isEmpty && (
               <ModusWcButton variant="outlined" color="tertiary" size="sm" onButtonClick={loadTestWorkflow}>
                 <ModusWcIcon slot="start" name="schema" size="sm" decorative />
