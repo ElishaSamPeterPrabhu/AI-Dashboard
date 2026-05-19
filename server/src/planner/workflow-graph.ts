@@ -66,11 +66,13 @@ export function contextKeyForNode(n: WfNode): string {
   // plannerKey is always the camelCase key the AI uses in formulas — prefer it for all node types
   const pk = (d.plannerKey as string)?.trim();
   if (pk) return pk;
-  // Fallback for nodes without plannerKey (manually placed nodes, etc.)
-  if (n.type === "input" || n.type === "assumption") {
+  // description holds the variable name for input/assumption/database nodes
+  if (n.type === "input" || n.type === "assumption" || n.type === "database") {
     const k = (d.description as string)?.trim();
-    if (k && !k.includes(" ")) return k; // only use description if it looks like a variable name
+    if (k && !k.includes(" ")) return k;
   }
+  // node.id is always camelCase and is what formulas reference — prefer over label
+  if (n.id && !n.id.includes(" ")) return n.id;
   const label = (d.label as string)?.trim() || n.id;
   return label.replace(/\s+/g, "_").toLowerCase();
 }
