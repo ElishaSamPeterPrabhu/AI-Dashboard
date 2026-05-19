@@ -34,20 +34,22 @@ html, body, #root {
   }
 }
 
-/* Canvas toolbar: cap project name badge width and force truncation */
-modus-wc-badge.nf-canvas-project-badge {
-  max-width: 120px;
-  min-width: 0;
+/* Canvas toolbar project badge — plain span for reliable truncation */
+span.nf-canvas-project-badge {
+  display: inline-block;
   flex-shrink: 1;
-  overflow: hidden;
-}
-modus-wc-badge.nf-canvas-project-badge::part(badge),
-modus-wc-badge.nf-canvas-project-badge::part(label) {
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
-  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 10px;
+  background-color: var(--modus-wc-color-primary, #0063a3);
+  color: #fff;
+  letter-spacing: 0.01em;
 }
 
 /* ─── AI gradient frame (from modus-blueprint) ──────────── */

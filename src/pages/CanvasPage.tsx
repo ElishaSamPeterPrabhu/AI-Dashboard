@@ -289,14 +289,12 @@ export default function CanvasPage() {
               customClass="m-0 text-[var(--modus-wc-color-base-content)] truncate"
             />
             {project && (
-              <ModusWcBadge
-                color={badgeColorForProjectId(project.id)}
-                size="sm"
-                customClass="nf-canvas-project-badge"
+              <span
+                className="nf-canvas-project-badge"
                 title={project.name}
               >
                 {project.name.length > 18 ? `${project.name.slice(0, 18)}…` : project.name}
-              </ModusWcBadge>
+              </span>
             )}
           </div>
 
