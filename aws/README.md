@@ -11,6 +11,28 @@ Deploy the **NestJS BFF** to **Elastic Beanstalk** and the **React UI** to **Amp
 
 ---
 
+## Part 0 — CloudFront HTTPS (required for canvas to load)
+
+Amplify and Trimble Assist are HTTPS. EB is HTTP by default. The browser blocks mixed-content requests (HTTPS page → HTTP API). Fix: put a free CloudFront distribution in front of EB.
+
+1. [CloudFront Console](https://console.aws.amazon.com/cloudfront) → **Create distribution**
+2. **Origin domain:** `Ai-dashboard-prod.eba-qpt2x3g2.us-east-1.elasticbeanstalk.com`  
+   **Protocol:** HTTP only, port 80
+3. **Default cache behavior:**
+   - Viewer protocol: **Redirect HTTP to HTTPS**
+   - Cache policy: **CachingDisabled**
+   - Origin request policy: **AllViewer**
+4. WAF: disable
+5. **Create** → wait ~5 min → copy the `dXXX.cloudfront.net` domain
+
+After deploy, update:
+- **EB environment properties:** `BFF_PUBLIC_URL = https://dXXX.cloudfront.net`
+- **Amplify environment variables:** `VITE_API_BASE = https://dXXX.cloudfront.net`
+- Rebuild + redeploy EB zip (`npm run bundle:eb` → Upload and deploy)
+- Amplify auto-redeploys on the next push (or trigger manually)
+
+---
+
 ## Part A — One-time AWS account setup
 
 ### 1. Create an IAM user for deploys (recommended)
