@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { PlannerService } from "./planner.service";
 import { StoreService } from "../store/store.service";
@@ -141,6 +141,7 @@ export class DemoRunService {
   private readonly logger = new Logger(DemoRunService.name);
 
   constructor(
+    @Inject(forwardRef(() => PlannerService))
     private readonly planner: PlannerService,
     private readonly store: StoreService
   ) {}

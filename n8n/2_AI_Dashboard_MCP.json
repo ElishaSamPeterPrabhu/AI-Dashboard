@@ -17,7 +17,7 @@
         "description": "**Purpose**: Build and execute a visual AI workflow from a natural language prompt.\n\nUse when the user wants to:\n- Model or estimate anything (costs, capacity, risks, schedules)\n- Plan a sprint, project, or resource allocation\n- Run a financial or operational simulation\n- Visualise any calculation or decision process as a graph\n\n**Inputs**:\n- `prompt` (required): Natural language description. Include any known values (team size, rates, dates, domain context from the current project).\n- `threadId` (optional): Pass back the previous threadId to continue a multi-turn conversation.\n- `workflowId` (optional): Pass back to edit an existing workflow.\n\n**Output**:\n- `result`: Human-readable summary from the AI Planner\n- `workflowId`: ID of the built/updated workflow\n- `canvasUrl`: Direct link to the interactive canvas editor — share this with the user\n- `threadId`: Pass this back in the next call to continue the conversation\n\n**Example prompts**:\n- `\"Sprint plan for team of 8, velocity 42, daily rate $200, 10-day sprint\"`\n- `\"Model construction material costs for Phase 1 of Highway Alpha\"`\n- `\"Compare frontend vs backend effort — frontend: 5 devs, backend: 3 devs\"`\n- `\"Risk-adjusted cost estimate: $50k base, 15% buffer, 10% risk factor\"`",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_SUBWORKFLOW_ID",
+          "value": "VfpVpzbhouTAcYA",
           "mode": "list",
           "cachedResultName": "ai_dashboard_build_workflow"
         },

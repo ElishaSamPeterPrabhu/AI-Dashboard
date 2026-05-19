@@ -1,38 +1,35 @@
-name: Deploy UI to Azure Static Web Apps
+name: Build UI (deploy via AWS Amplify)
+
+# Amplify Hosting reads amplify.yml when you connect this repo in the AWS Amplify Console.
+# This workflow only verifies the production build in CI.
 
 on:
   push:
-    branches: [main]
+    branches: [feature/mcp-apps-canvas]
     paths:
-      - 'src/**'
-      - 'public/**'
-      - 'index.html'
-      - 'vite.config.*'
-      - 'package.json'
-      - '.github/workflows/deploy-ui.yml'
-
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.*"
+      - "package.json"
+      - "amplify.yml"
+      - ".github/workflows/deploy-ui.yml"
   pull_request:
-    branches: [main]
-
+    branches: [feature/mcp-apps-canvas]
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
 
-      - name: Build and deploy to Static Web Apps
-        uses: azure/static-web-apps-deploy@v1
+      - uses: actions/setup-node@v4
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: '/'          # root of repo
-          output_location: 'dist'    # Vite build output
-          app_build_command: 'npm run build'
+          node-version: "22"
+          cache: npm
+
+      - name: Build Vite app
+        run: npm ci && npm run build
         env:
-          VITE_API_BASE_URL: https://ai-dashboard.azurewebsites.net
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}

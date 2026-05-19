@@ -28,8 +28,8 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  prompt: $json.prompt,\n  threadId: $json.threadId || null,\n  runId: null,\n  workflowId: $json.workflowId || null\n}) }}",
+        "bodyContentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify({ prompt: $json.prompt, threadId: $json.threadId || null, runId: null, workflowId: $json.workflowId || null }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -59,7 +59,5 @@
   },
   "active": true,
   "settings": { "executionOrder": "v1" },
-  "meta": {
-    "instanceId": "ai-dashboard"
-  }
+  "meta": { "instanceId": "ai-dashboard" }
 }

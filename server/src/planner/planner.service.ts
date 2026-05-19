@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -17,6 +19,7 @@ import {
   type WfEdge,
   type WfNode,
 } from "./workflow-graph";
+import { DemoRunService } from "./demo-run.service";
 
 function coerceContext(ctx: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -68,11 +71,44 @@ export class PlannerService {
   constructor(
     private readonly store: StoreService,
     private readonly agents: TrimbleAgentsService,
-    private readonly scriptRunner: ScriptRunnerService
+    private readonly scriptRunner: ScriptRunnerService,
+    @Inject(forwardRef(() => DemoRunService))
+    private readonly demoRun: DemoRunService
   ) {}
 
   listTools() {
     return [
+      {
+        name: "build_workflow",
+        description:
+          "Run the Trimble planner agent end-to-end: interprets the user prompt, builds or edits the workflow graph (including Workflow_Builder when configured), materializes it in the BFF store, and executes it—same behavior as POST /api/demo/run.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            prompt: { type: "string", description: "User instruction for the planner" },
+            threadId: {
+              type: "string",
+              description:
+                "Optional. Trimble Agent thread id from a prior build_workflow response for multi-turn chat.",
+            },
+            runId: {
+              type: "string",
+              description:
+                "Optional. Usually omitted; new agent turns use a fresh run (same as the demo UI).",
+            },
+            workflowId: {
+              type: "string",
+              description: "Optional. Existing workflow canvas id to continue editing.",
+            },
+          },
+          required: ["prompt"],
+        },
+        _meta: {
+          ui: {
+            resourceUri: "ui://workflow-canvas",
+          },
+        },
+      },
       {
         name: "create_workflow",
         description:
@@ -434,8 +470,32 @@ window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*
 </html>`;
   }
 
+  private optionalToolString(v: unknown): string | null {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "string") {
+      const t = v.trim();
+      return t.length > 0 ? t : null;
+    }
+    return null;
+  }
+
+  async toolBuildWorkflow(args: Record<string, unknown>) {
+    const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
+    if (!prompt) {
+      throw new BadRequestException("build_workflow requires a non-empty prompt string");
+    }
+    return this.demoRun.run({
+      prompt,
+      threadId: this.optionalToolString(args.threadId),
+      runId: this.optionalToolString(args.runId),
+      workflowId: this.optionalToolString(args.workflowId),
+    });
+  }
+
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     switch (name) {
+      case "build_workflow":
+        return await this.toolBuildWorkflow(args);
       case "create_workflow":
         return this.toolCreateWorkflow(
           args as { projectId: string; name: string; description?: string }

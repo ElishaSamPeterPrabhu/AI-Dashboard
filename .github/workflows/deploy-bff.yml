@@ -1,45 +1,52 @@
-name: Deploy BFF to Azure App Service
+name: Deploy BFF to AWS Elastic Beanstalk
 
 on:
   push:
-    branches: [main]
+    branches: [feature/mcp-apps-canvas]
     paths:
-      - 'server/**'
-      - '.github/workflows/deploy-bff.yml'
-
+      - "server/**"
+      - ".github/workflows/deploy-bff.yml"
   workflow_dispatch:
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+env:
+  AWS_REGION: us-east-1
+  EB_APPLICATION_NAME: ai-dashboard
+  EB_ENVIRONMENT_NAME: ai-dashboard-prod
 
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: server/package-lock.json
+          node-version: "22"
+          cache: npm
 
-      - name: Install server dependencies
-        run: npm ci
-        working-directory: server
+      - name: Build NestJS BFF
+        run: npm ci && npm run build -w ai-dashboard-server
 
-      - name: Build TypeScript
-        run: npx tsc --project tsconfig.json
-        working-directory: server
-
-      - name: Zip artefact
+      - name: Bundle for Elastic Beanstalk
         run: |
-          cd server
-          zip -r ../deploy.zip dist package.json package-lock.json
-          # Include node_modules for prod deps (or use --omit=dev install in App Service startup)
+          mkdir -p eb-bundle
+          cp -r server/dist eb-bundle/dist
+          cp server/package.json server/Procfile eb-bundle/
+          if [ -d server/.ebextensions ]; then cp -r server/.ebextensions eb-bundle/; fi
+          cd eb-bundle
+          npm install --omit=dev --no-package-lock
+          cd ..
+          (cd eb-bundle && zip -r ../bff-deploy.zip .)
 
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
         with:
-          app-name: ai-dashboard
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: deploy.zip
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ env.EB_APPLICATION_NAME }}
+          environment_name: ${{ env.EB_ENVIRONMENT_NAME }}
+          region: ${{ env.AWS_REGION }}
+          version_label: ${{ github.sha }}
+          deployment_package: bff-deploy.zip
+          use_existing_version_if_available: true
+          wait_for_environment_recovery: 120

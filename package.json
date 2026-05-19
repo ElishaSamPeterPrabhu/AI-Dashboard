@@ -15,7 +15,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:ai": "node scripts/test-ai-bff.mjs",
-    "test:planner": "node scripts/test-planner-mcp.mjs"
+    "test:planner": "node scripts/test-planner-mcp.mjs",
+    "bundle:eb": "bash scripts/bundle-eb.sh"
   },
   "dependencies": {
     "@trimble-oss/agentic-ai-react": "workspace:*",

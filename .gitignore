@@ -8,6 +8,8 @@ dist/
 dist-ssr/
 build/
 out/
+eb-bundle/
+bff-deploy.zip
 
 # Environment variables
 .env

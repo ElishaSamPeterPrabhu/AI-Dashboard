@@ -35,7 +35,7 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'NODE|20-lts'
+      linuxFxVersion: 'NODE|22-lts'
       appCommandLine: 'node dist/main.js'
       appSettings: [
         { name: 'NODE_ENV',              value: 'production' }

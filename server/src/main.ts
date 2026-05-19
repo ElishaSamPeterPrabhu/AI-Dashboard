@@ -146,16 +146,25 @@ async function bootstrap() {
     ],
   });
 
-  // CORS: allow local dev + any configured production origin
+  // CORS: local dev + configured URLs + common hosting patterns (AWS / Azure / Assist)
   const corsOrigins: (string | RegExp)[] = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://assist.stage.trimble-ai.com",
   ];
+  const stripSlash = (u: string) => u.replace(/\/$/, "");
   if (process.env.BFF_PUBLIC_URL) {
-    corsOrigins.push(process.env.BFF_PUBLIC_URL.replace(/\/$/, ""));
+    corsOrigins.push(stripSlash(process.env.BFF_PUBLIC_URL));
   }
-  // Allow Azure Static Web Apps origin pattern
+  if (process.env.UI_PUBLIC_URL) {
+    corsOrigins.push(stripSlash(process.env.UI_PUBLIC_URL));
+  }
+  if (process.env.CORS_EXTRA_ORIGIN) {
+    corsOrigins.push(stripSlash(process.env.CORS_EXTRA_ORIGIN));
+  }
   corsOrigins.push(/\.azurestaticapps\.net$/);
+  corsOrigins.push(/\.amplifyapp\.com$/);
+  corsOrigins.push(/\.elasticbeanstalk\.com$/);
 
   app.enableCors({
     origin: corsOrigins,
