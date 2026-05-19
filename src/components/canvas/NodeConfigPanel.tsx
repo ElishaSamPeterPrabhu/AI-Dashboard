@@ -9,7 +9,7 @@ import {
   ModusWcSelect,
 } from "@trimble-oss/moduswebcomponents-react";
 import { useCanvasStore } from "@/store/canvasStore";
-import { apiGet } from "@/api/http";
+import { apiGet, apiPost } from "@/api/http";
 
 // ── Agent binding widget ──────────────────────────────────────────────────────
 
@@ -38,14 +38,10 @@ function AgentBindingWidget({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/agents/provision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nodeLabel || "AI Node", systemPrompt }),
-        credentials: "include",
-      });
-      const json = await res.json() as { agentId?: string; agentName?: string; error?: string };
-      if (!res.ok) throw new Error(json.error ?? `${res.status}`);
+      const json = await apiPost<{ agentId?: string; agentName?: string }>(
+        "/api/agents/provision",
+        { name: nodeLabel || "AI Node", systemPrompt }
+      );
       onBound(json.agentId!, json.agentName!);
     } catch (e) {
       setError((e as Error).message);

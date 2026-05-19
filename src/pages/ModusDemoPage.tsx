@@ -11,8 +11,9 @@ import {
   ModusWcTypography,
 } from "@trimble-oss/moduswebcomponents-react";
 import { useAppStore } from "@/store/appStore";
+import { apiBase } from "@/api/http";
 
-const BASE = "/api";
+const BASE = `${apiBase()}/api`;
 const PROJECT_ID = "p1";
 
 type Role = "user" | "assistant" | "system";
