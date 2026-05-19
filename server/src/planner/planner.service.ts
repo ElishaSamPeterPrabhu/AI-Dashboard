@@ -165,6 +165,33 @@ export class PlannerService {
           },
         },
       },
+      {
+        name: "get_canvas",
+        description:
+          "Return the current nodes and edges for an existing workflow canvas. Call this before update_node to see existing node ids and current values.",
+        inputSchema: {
+          type: "object",
+          properties: { workflowId: { type: "string" } },
+          required: ["workflowId"],
+        },
+      },
+      {
+        name: "update_node",
+        description:
+          "Patch data fields on an existing node (e.g. change an input value or formula). Does not change node type or position. Call execute_workflow afterwards to re-run with updated values.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            workflowId: { type: "string" },
+            nodeId: { type: "string", description: "The node id to update (same as the id used in add_node)" },
+            data: {
+              type: "object",
+              description: "Fields to merge into node.data — e.g. { \"value\": 6 } to change an input, { \"formula\": \"a+b\" } to change a calculator",
+            },
+          },
+          required: ["workflowId", "nodeId", "data"],
+        },
+      },
     ];
   }
 
@@ -486,6 +513,47 @@ window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*
 </html>`;
   }
 
+  toolGetCanvas(args: { workflowId: string }) {
+    const found = this.store.findWorkflowById(args.workflowId);
+    if (!found) throw new NotFoundException(`workflow ${args.workflowId} not found`);
+    const canvas = this.store.getCanvas(args.workflowId);
+    return {
+      workflowId: args.workflowId,
+      nodes: (canvas.nodes as WfNode[]).map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: n.position,
+        data: {
+          label: n.data?.label,
+          value: n.data?.value,
+          formula: n.data?.formula,
+          description: n.data?.description,
+          chartType: n.data?.chartType,
+          chartKeys: n.data?.chartKeys,
+        },
+      })),
+      edges: canvas.edges,
+    };
+  }
+
+  toolUpdateNode(args: { workflowId: string; nodeId: string; data: Record<string, unknown> }) {
+    const found = this.store.findWorkflowById(args.workflowId);
+    if (!found) throw new NotFoundException(`workflow ${args.workflowId} not found`);
+    const canvas = this.store.getCanvas(args.workflowId);
+    const nodes = canvas.nodes as WfNode[];
+    const node = nodes.find((n) => n.id === args.nodeId);
+    if (!node) throw new NotFoundException(`node ${args.nodeId} not found in workflow ${args.workflowId}`);
+    node.data = { ...(node.data ?? {}), ...args.data };
+    delete node.data.executionState;
+    delete node.data._result;
+    delete node.data._resultRaw;
+    delete node.data._toolCalls;
+    delete node.data._script;
+    this.store.saveCanvas(args.workflowId, { nodes, edges: canvas.edges as WfEdge[] });
+    this.store.touchWorkflow(found.projectId, args.workflowId);
+    return { ok: true, nodeId: args.nodeId, updatedData: node.data };
+  }
+
   private optionalToolString(v: unknown): string | null {
     if (v === null || v === undefined) return null;
     if (typeof v === "string") {
@@ -531,6 +599,10 @@ window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*
         );
       case "execute_workflow":
         return await this.toolExecuteWorkflow(args as { workflowId: string });
+      case "get_canvas":
+        return this.toolGetCanvas(args as { workflowId: string });
+      case "update_node":
+        return this.toolUpdateNode(args as { workflowId: string; nodeId: string; data: Record<string, unknown> });
       default:
         throw new BadRequestException(`Unknown tool: ${name}`);
     }
