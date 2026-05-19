@@ -37,21 +37,21 @@ After receiving `bff_execution_result` JSON, reply `type:"chat"` summarising res
 
 ## Node types for `add_node`
 
-Each node: `id` (camelCase, unique — used in edges **and** formulas), `type`, `position:{x,y}`, `data:{label,...}`
+Each node: `id` (camelCase, unique), `type`, `position:{x,y}`, `data:{label,...}`
 
-**Critical:** For `input` and `database` nodes, set `data.description` to the **same string as the node `id`** (e.g. node id `dailyCost` → `description: "dailyCost"`). The executor uses `description` as the formula variable name. If it contains spaces it is ignored and formulas break.
+**Variable name rule:** For `input` and `database` nodes, `data.description` **must equal the node `id`** exactly (e.g. id `dailyCost` → `description: "dailyCost"`). The executor uses this as the formula variable name; if it has spaces it is ignored and calculator formulas silently return empty.
 
-| type | data fields | use when |
-|------|-------------|----------|
-| trigger | label | always — first node |
-| input | label, value, description=**camelCase id** | user-provided number/text |
-| database | label, value, description=**camelCase id** | lookup rate/constant |
-| calculator | label, formula (uses upstream node `id` values as variable names) | arithmetic |
-| assumption | label, min, max, mostLikely | range estimate |
-| chart | label, chartType("bar"/"pie"), chartKeys:[ids] | visualise values |
-| connector | label | merge parallel lanes |
-| output | label | final result |
-| ai | label, description (≤120 chars, `{{id}}` placeholders; wire direct edges from every referenced id) | **only add if user explicitly asks for a narrative or summary** |
+| type | required `data` fields | what it produces | notes |
+|------|----------------------|-----------------|-------|
+| trigger | label | nothing (starts the graph) | always first; connect it to every top-level node |
+| input | label, **value**, **description=id** | the `value` as a number/string | wire from trigger |
+| database | label, **entries=[{key,value}]** | each entry as a named variable | use for rate tables; wire from trigger |
+| calculator | label, **formula** | computed number | formula uses upstream node `id`s as variable names: `teamSize * dailyRate` |
+| assumption | label, min, max, mostLikely | sampled value from triangular distribution | for "roughly X–Y" estimates |
+| chart | label, **chartType**("bar"/"pie"), **chartKeys**:[nodeIds] | bar/pie visualisation | `chartKeys` = list of upstream node `id`s to plot |
+| connector | label | merged context from all incoming lanes | last node of each parallel lane → connector; downstream calcs see all keys |
+| output | label | displays last upstream value | receives text from an `ai` node or number from a `calculator` |
+| ai | label, **description** (system prompt ≤120 chars; use `{{nodeId}}` to inject upstream values; wire direct edges from every `{{id}}` used) | agent-generated text | **only add if user explicitly asks**; each adds ~20s runtime |
 
 `connect_nodes`: `{ workflowId, source:"id", target:"id" }`
 
