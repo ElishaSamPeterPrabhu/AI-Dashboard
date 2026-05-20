@@ -359,10 +359,21 @@ export class PlannerService {
             _result: run.errorMessage ?? "Agent error",
           });
         } else {
+          // If agent produced no text but ran tool calls, use the last script result as summary
+          const aiText = run.result?.trim()
+            || (run.toolCalls?.length
+              ? (() => {
+                  const last = run.toolCalls[run.toolCalls.length - 1];
+                  const val = (last as { result?: unknown }).result;
+                  const script = (last as { script?: string }).script;
+                  if (val != null) return `${script ?? "result"} = ${String(val)}`;
+                  return "";
+                })()
+              : "");
           nodes = patchNodesData(nodes, [n.id], {
             executionState: "done",
             status: "idle",
-            _result: run.result,
+            _result: aiText,
             ...(run.toolCalls?.length ? { _toolCalls: run.toolCalls } : {}),
             ...(run.script ? { _script: run.script } : {}),
           });

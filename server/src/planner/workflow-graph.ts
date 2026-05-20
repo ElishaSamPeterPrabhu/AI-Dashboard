@@ -90,7 +90,9 @@ export function valueForContextFromNode(n: WfNode): unknown {
     return d._resultRaw ?? d._result ?? d.executionResult;
   }
   if (n.type === "input") return d._result ?? d.value ?? d.executionResult;
-  return d._result ?? d.value ?? d.executionResult;
+  // For ai/output/other nodes, treat empty string as missing (agent may produce no text)
+  const r = d._result ?? d.value ?? d.executionResult;
+  return (r === "" || r == null) ? null : r;
 }
 
 export function assembleInputContext(
