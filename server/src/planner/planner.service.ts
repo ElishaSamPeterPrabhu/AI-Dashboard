@@ -79,37 +79,6 @@ export class PlannerService {
   listTools() {
     return [
       {
-        name: "build_workflow",
-        description:
-          "Run the Trimble planner agent end-to-end: interprets the user prompt, builds or edits the workflow graph (including Workflow_Builder when configured), materializes it in the BFF store, and executes it—same behavior as POST /api/demo/run.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            prompt: { type: "string", description: "User instruction for the planner" },
-            threadId: {
-              type: "string",
-              description:
-                "Optional. Trimble Agent thread id from a prior build_workflow response for multi-turn chat.",
-            },
-            runId: {
-              type: "string",
-              description:
-                "Optional. Usually omitted; new agent turns use a fresh run (same as the demo UI).",
-            },
-            workflowId: {
-              type: "string",
-              description: "Optional. Existing workflow canvas id to continue editing.",
-            },
-          },
-          required: ["prompt"],
-        },
-        _meta: {
-          ui: {
-            resourceUri: "ui://workflow-canvas",
-          },
-        },
-      },
-      {
         name: "create_workflow",
         description:
           "Create a new empty workflow under a project. Returns workflow id for add_node / connect_nodes / execute_workflow.",
