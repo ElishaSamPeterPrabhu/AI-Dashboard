@@ -303,9 +303,11 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
   // Database entry local state
   const [newKey, setNewKey] = useState("");
   const [newVal, setNewVal] = useState("");
+  const [dbKeyError, setDbKeyError] = useState(false);
 
   const addEntry = () => {
-    if (!newKey.trim()) return;
+    if (!newKey.trim()) { setDbKeyError(true); return; }
+    setDbKeyError(false);
     const entries = [...((d.entries as { key: string; value: string }[]) ?? [])];
     entries.push({ key: newKey.trim(), value: newVal.trim() });
     update("entries", entries);
@@ -530,8 +532,13 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
                 label="Key"
                 placeholder="e.g. engineerDailyRate"
                 value={newKey}
-                onInputChange={(e: CustomEvent) => setNewKey(inputVal(e))}
+                onInputChange={(e: CustomEvent) => { setNewKey(inputVal(e)); setDbKeyError(false); }}
               />
+              {dbKeyError && (
+                <p className="m-0 text-xs" style={{ color: "var(--modus-wc-color-danger, #da212c)", fontFamily: "system-ui" }}>
+                  Key is required
+                </p>
+              )}
               <ModusWcTextInput
                 label="Value"
                 placeholder="e.g. 800"
