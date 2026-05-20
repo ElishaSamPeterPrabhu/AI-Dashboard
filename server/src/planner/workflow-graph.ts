@@ -34,8 +34,9 @@ export function topologicalBatches(nodes: WfNode[], edges: WfEdge[]): WfNode[][]
     outEdges.get(e.source)!.push(e.target);
   }
 
-  // Only execute nodes reachable from a trigger node
+  // Only execute nodes reachable from a trigger node; nothing runs without a trigger
   const triggerIds = execNodes.filter((n) => n.type === "trigger").map((n) => n.id);
+  if (triggerIds.length === 0) return [];
   const reachable = new Set<string>(triggerIds);
   const queue = [...triggerIds];
   while (queue.length > 0) {
@@ -47,10 +48,7 @@ export function topologicalBatches(nodes: WfNode[], edges: WfEdge[]): WfNode[][]
       }
     }
   }
-  // If no trigger exists, fall back to all nodes (so manual/partial graphs still run)
-  const activeNodes = triggerIds.length > 0
-    ? execNodes.filter((n) => reachable.has(n.id))
-    : execNodes;
+  const activeNodes = execNodes.filter((n) => reachable.has(n.id));
 
   const activeMap = new Map(activeNodes.map((n) => [n.id, n]));
   const activeInDegree = new Map<string, number>(activeNodes.map((n) => [n.id, 0]));

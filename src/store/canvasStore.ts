@@ -43,8 +43,9 @@ function topologicalBatches(nodes: Node[], edges: Edge[]): Node[][] {
     outEdges.get(e.source)!.push(e.target);
   }
 
-  // Only execute nodes reachable from a trigger node
+  // Only execute nodes reachable from a trigger node; nothing runs without a trigger
   const triggerIds = execNodes.filter((n) => n.type === "trigger").map((n) => n.id);
+  if (triggerIds.length === 0) return [];
   const reachable = new Set<string>(triggerIds);
   const queue = [...triggerIds];
   while (queue.length > 0) {
@@ -53,8 +54,7 @@ function topologicalBatches(nodes: Node[], edges: Edge[]): Node[][] {
       if (!reachable.has(next)) { reachable.add(next); queue.push(next); }
     }
   }
-  // Fall back to all nodes if no trigger exists
-  const activeNodes = triggerIds.length > 0 ? execNodes.filter((n) => reachable.has(n.id)) : execNodes;
+  const activeNodes = execNodes.filter((n) => reachable.has(n.id));
   const activeMap = new Map(activeNodes.map((n) => [n.id, n]));
 
   const inDegree = new Map<string, number>(activeNodes.map((n) => [n.id, 0]));
