@@ -36,36 +36,49 @@ function topologicalBatches(nodes: Node[], edges: Edge[]): Node[][] {
   const execNodes = nodes.filter((n) => !SKIP_TYPES.has(n.type ?? ""));
   const nodeMap = new Map(execNodes.map((n) => [n.id, n]));
 
-  // Build in-degree map (only counting edges between executable nodes)
-  const inDegree = new Map<string, number>(execNodes.map((n) => [n.id, 0]));
-  const outEdges = new Map<string, string[]>(); // source → [targets]
-
+  const outEdges = new Map<string, string[]>();
   for (const e of edges) {
     if (!nodeMap.has(e.source) || !nodeMap.has(e.target)) continue;
-    inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
     if (!outEdges.has(e.source)) outEdges.set(e.source, []);
     outEdges.get(e.source)!.push(e.target);
   }
 
+  // Only execute nodes reachable from a trigger node
+  const triggerIds = execNodes.filter((n) => n.type === "trigger").map((n) => n.id);
+  const reachable = new Set<string>(triggerIds);
+  const queue = [...triggerIds];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const next of outEdges.get(cur) ?? []) {
+      if (!reachable.has(next)) { reachable.add(next); queue.push(next); }
+    }
+  }
+  // Fall back to all nodes if no trigger exists
+  const activeNodes = triggerIds.length > 0 ? execNodes.filter((n) => reachable.has(n.id)) : execNodes;
+  const activeMap = new Map(activeNodes.map((n) => [n.id, n]));
+
+  const inDegree = new Map<string, number>(activeNodes.map((n) => [n.id, 0]));
+  for (const e of edges) {
+    if (!activeMap.has(e.source) || !activeMap.has(e.target)) continue;
+    inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
+  }
+
   const batches: Node[][] = [];
-  const remaining = new Set(execNodes.map((n) => n.id));
+  const remaining = new Set(activeNodes.map((n) => n.id));
 
   while (remaining.size > 0) {
-    // Collect all nodes with in-degree 0
     const batch = [...remaining]
       .filter((id) => (inDegree.get(id) ?? 0) === 0)
-      .map((id) => nodeMap.get(id)!);
+      .map((id) => activeMap.get(id)!);
 
     if (batch.length === 0) {
-      // Cycle detected — run remaining nodes as a final batch to avoid hanging
-      batch.push(...[...remaining].map((id) => nodeMap.get(id)!));
+      batch.push(...[...remaining].map((id) => activeMap.get(id)!));
       batches.push(batch);
       break;
     }
 
     batches.push(batch);
 
-    // Remove batch nodes and decrement in-degrees of their successors
     for (const n of batch) {
       remaining.delete(n.id);
       for (const target of outEdges.get(n.id) ?? []) {
