@@ -1,0 +1,10 @@
+mcps:
+  - name: ai-dashboard-mcp
+    description: "AI Dashboard workflow canvas MCP server — create, edit and execute visual workflows from Trimble Assist"
+    author: "Trimble-Agentic"
+    minReplicas: 1
+    maxReplicas: 3
+    workload-profile: D2
+    cpu: 2
+    memory: 4Gi
+    dockerFile: Dockerfile
