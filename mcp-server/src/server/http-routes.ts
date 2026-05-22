@@ -22,9 +22,20 @@ export function setupHealthRoute(app: Express): void {
   });
 }
 
+const DEBUG = process.env.DEBUG_AUTH === '1';
+
 export function setupMcpRoutes(app: Express, sessions: SessionManager): void {
   app.post('/mcp', async (req: Request, res: Response) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    if (DEBUG) {
+      console.log('[DEBUG_AUTH] POST /mcp', JSON.stringify({
+        method: req.body?.method,
+        hasAuth: !!req.headers['authorization'],
+        hasMcpSession: !!sessionId,
+        userAgent: req.headers['user-agent'],
+        accept: req.headers['accept'],
+      }));
+    }
     try {
       let transport: StreamableHTTPServerTransport;
       if (sessionId && sessions.has(sessionId)) {

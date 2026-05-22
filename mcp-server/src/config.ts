@@ -17,8 +17,14 @@ export const config = {
     version: process.env.VERSION ?? '1.0.0',
   },
   auth: {
+    // Audiences the server accepts in the JWT 'aud' claim (comma-separated env var).
+    authZ: requiredEnv('JWT_AUDIENCE')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean),
     oauthServerUrl,
-    discoveryUrl: `${tokenIssuerUrl}/.well-known/openid-configuration`,
+    // Discovery fetched from the OAuth proxy (has registration_endpoint for Studio).
+    discoveryUrl: `${oauthServerUrl}/.well-known/openid-configuration`,
     tokenIssuerUrl,
     jwksUrl: `${tokenIssuerUrl}/.well-known/jwks.json`,
   },

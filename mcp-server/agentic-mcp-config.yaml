@@ -8,3 +8,41 @@ mcps:
     cpu: 2
     memory: 4Gi
     dockerFile: Dockerfile
+    envVars:
+      # OAuth proxy — used for discovery (has registration_endpoint for Studio).
+      # dev:   https://id-mcp.dev.trimble-transportation.com
+      # stage: https://id-mcp.staging.trimble-transportation.com
+      # prod:  https://id-mcp.trimble-transportation.com
+      - name: OAUTH_SERVER_URL
+        value: https://id-mcp.dev.trimble-transportation.com
+      # Real TID issuer — matches the 'iss' claim in Studio-issued tokens and the JWKS endpoint.
+      # dev/prod: https://id.trimble.com
+      # stage:    https://stage.id.trimblecloud.com
+      - name: TOKEN_ISSUER_URL
+        value: https://id.trimble.com
+      # JWT audience — what Studio asks for when minting an actor token for this server.
+      # prod: 1c5cf54b-928a-4d78-a9f4-fd44a7cb8ddc
+      # stage: 13b1bf43-8ac8-49e5-8df6-535cc6d885b3
+      - name: JWT_AUDIENCE
+        value: "1c5cf54b-928a-4d78-a9f4-fd44a7cb8ddc"
+      - name: SERVER_NAME
+        value: ai-dashboard-mcp
+      - name: TRIMBLE_AGENT_BASE_URL
+        value: https://agents.ai.trimble.com
+      - name: PORT
+        value: "4000"
+      - name: RESOURCE_SERVER_URL
+        value: https://ca-eus-tmp-ai-dashboard-mcp.victorioussmoke-3ce457d0.eastus2.azurecontainerapps.io
+      # Set to "1" temporarily to emit decoded token claims + jose errors in logs.
+      # Remove once root cause confirmed.
+      - name: DEBUG_AUTH
+        value: "1"
+    secrets:
+      - name: CLIENT_ID
+        githubSecretRef: CLIENT_ID
+      - name: CLIENT_SECRET
+        githubSecretRef: CLIENT_SECRET
+      - name: DEMO_PLANNER_AGENT_ID
+        githubSecretRef: DEMO_PLANNER_AGENT_ID
+      - name: UI_PUBLIC_URL
+        githubSecretRef: UI_PUBLIC_URL
