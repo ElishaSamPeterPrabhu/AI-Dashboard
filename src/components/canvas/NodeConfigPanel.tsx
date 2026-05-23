@@ -8,7 +8,6 @@ import {
   ModusWcIcon,
   ModusWcSelect,
 } from "@trimble-oss/moduswebcomponents-react";
-import { clearStoredToken, getStoredToken, openTidLogin } from "@/auth/tid";
 import { useCanvasStore } from "@/store/canvasStore";
 import { apiGet, apiPost } from "@/api/http";
 
@@ -48,51 +47,7 @@ function AgentBindingWidget({
   const [searchTerm, setSearchTerm] = useState("");
   const [pasteId, setPasteId] = useState("");
   const [pasteLoading, setPasteLoading] = useState(false);
-  const [signedIn, setSignedIn] = useState(() => Boolean(getStoredToken()));
-  const [authBusy, setAuthBusy] = useState(false);
-  const [authError, setAuthError] = useState("");
   const [agentBaseUrl, setAgentBaseUrl] = useState<string | null>(null);
-  const signInLabelRef = useRef<HTMLSpanElement>(null);
-
-  const refreshAuth = () => {
-    const ok = Boolean(getStoredToken());
-    setSignedIn(ok);
-    if (!ok) setAuthError("");
-  };
-
-  useEffect(() => {
-    refreshAuth();
-    window.addEventListener("focus", refreshAuth);
-    void apiGet<{ agentBaseUrl?: string | null }>("/api/health")
-      .then((h) => setAgentBaseUrl(h.agentBaseUrl ?? null))
-      .catch(() => setAgentBaseUrl(null));
-    return () => window.removeEventListener("focus", refreshAuth);
-  }, []);
-
-  useEffect(() => {
-    if (signInLabelRef.current) {
-      signInLabelRef.current.textContent = authBusy ? "Signing in…" : "Sign in with Trimble";
-    }
-  }, [authBusy]);
-
-  const signIn = async () => {
-    setAuthBusy(true);
-    setAuthError("");
-    try {
-      await openTidLogin();
-      setSignedIn(true);
-    } catch (e) {
-      setAuthError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const signOut = () => {
-    clearStoredToken();
-    setSignedIn(false);
-    setAuthError("");
-  };
 
   const provision = async () => {
     setLoading(true);
@@ -114,11 +69,6 @@ function AgentBindingWidget({
     setPickLoading(true);
     setError("");
     try {
-      if (!getStoredToken()) {
-        setError("Sign in required to browse agents.");
-        setAgents([]);
-        return;
-      }
       const url = search?.trim() ? `/api/agents?search=${encodeURIComponent(search)}` : "/api/agents";
       const list = await apiGet<Array<{ id: string; name: string; description?: string }>>(url);
       setAgents(list);
@@ -174,55 +124,14 @@ function AgentBindingWidget({
 
   // Auto-resolve name when bound but name is a placeholder (best-effort; failures are normal)
   useEffect(() => {
-    if (!agentId || !signedIn || (agentName && agentName.length > 12 && agentName !== agentId)) return;
+    if (!agentId || (agentName && agentName.length > 12 && agentName !== agentId)) return;
     void apiGet<{ id: string; name: string } | null>(`/api/agents/${encodeURIComponent(agentId)}/info`)
       .then((a) => { if (a?.name && a.name !== agentId) onBound(agentId, a.name); })
       .catch(() => {});
-  }, [agentId, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-2">
-      {!signedIn ? (
-        <>
-          <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>
-            Sign in to bind or create a Trimble agent for this node.
-          </p>
-          <ModusWcButton
-            variant="filled"
-            color="primary"
-            size="sm"
-            disabled={authBusy}
-            onButtonClick={() => void signIn()}
-          >
-            <ModusWcIcon slot="start" name="account_circle" size="sm" decorative />
-            <span ref={signInLabelRef}>Sign in with Trimble</span>
-          </ModusWcButton>
-          {authError && (
-            <p className="m-0 text-xs" style={{ color: "var(--modus-wc-color-danger)", fontFamily: "system-ui" }}>
-              {authError}
-            </p>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.35)" }}>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <i className="modus-icons" style={{ fontSize: 13, color: "#22c55e" }}>check_circle</i>
-              <span className="text-xs font-semibold text-emerald-400" style={{ fontFamily: "system-ui" }}>Signed in</span>
-            </div>
-            <button
-              type="button"
-              onClick={signOut}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modus-wc-color-base-content-low-contrast)", fontSize: 11, fontFamily: "system-ui", padding: 0 }}
-            >
-              Sign out
-            </button>
-          </div>
-          <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>
-            In Studio → agent → Access, grant app{" "}
-            <span style={{ fontFamily: "monospace" }}>61abccab…</span> (Viewer) so this dashboard can run the agent.
-          </p>
-
       {/* Bound state */}
       {isBound && (
         <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(8,145,178,0.08)", border: "1px solid #0891b2" }}>
@@ -405,8 +314,6 @@ function AgentBindingWidget({
       {/* Error */}
       {error && (
         <p className="m-0 text-xs" style={{ color: "var(--modus-wc-color-danger)", fontFamily: "system-ui" }}>{error}</p>
-      )}
-        </>
       )}
     </div>
   );

@@ -1,5 +1,3 @@
-import { getStoredToken } from "@/auth/tid";
-
 /** Set from ?apiBase= when embedded inside Assist MCP App (Amplify may lack VITE_API_BASE). */
 let runtimeApiBase = "";
 
@@ -16,10 +14,7 @@ const url = (path: string) =>
   `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`;
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {
-  const headers: Record<string, string> = { ...extra };
-  const token = getStoredToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
+  return { ...extra };
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
