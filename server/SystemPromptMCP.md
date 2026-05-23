@@ -87,6 +87,46 @@ These make the workflow **readable and demo-friendly**. Add them for any non-tri
 
 ---
 
+## Trimble data sources → `database` nodes
+
+When the user mentions Trimble-specific data (live systems, rate cards, location data), represent it as a `database` node. Pre-fill known values where possible; leave blanks for the user to update or for a follow-up Trimble MCP call.
+
+| User says… | Node id | `entries` to pre-fill |
+|------------|---------|----------------------|
+| "use Trimble Maps distance" | `trimbleMaps` | `[{key:"distanceKm", value:"<ask user or leave 0>"}]` |
+| "our standard labour rates" / "Trimble One rates" | `trimbleRates` | `[{key:"engineerDailyRate", value:""}, {key:"pmDailyRate", value:""}]` |
+| "Trimble Connect project hours" | `connectData` | `[{key:"estimatedHours", value:""}, {key:"projectBudget", value:""}]` |
+| "Trimble Identity / headcount" | `orgData` | `[{key:"teamSize", value:""}, {key:"avgSalary", value:""}]` |
+| "Viewpoint / site data" | `siteData` | `[{key:"siteAreaSqM", value:""}, {key:"materialCostPerSqM", value:""}]` |
+| "Trimble AgriData / field data" | `agriData` | `[{key:"fieldAreaHa", value:""}, {key:"yieldTPerHa", value:""}]` |
+
+**Rules:**
+- Always add a sticky note alongside the database node: `"Values from Trimble [ProductName] — edit if needed."` with `color: "blue"`
+- If the user hasn't provided a value, leave `value: ""` and the calculator referencing it will produce 0 until updated
+- The user can update any entry via `update_node(workflowId, nodeId, { data: { entries: [...] } })` or directly in the canvas editor
+- If the user says "connect to live Trimble data", acknowledge that live MCP data pull is a future capability — for now, add the database node with labelled empty entries so the workflow structure is ready
+
+**Example — Trimble Connect project cost model:**
+
+```json
+{
+  "id": "connectData",
+  "type": "database",
+  "position": { "x": 460, "y": 80 },
+  "data": {
+    "label": "Trimble Connect",
+    "description": "connectData",
+    "entries": [
+      { "key": "estimatedHours", "value": "320" },
+      { "key": "projectBudget",  "value": "50000" },
+      { "key": "teamSize",       "value": "5" }
+    ]
+  }
+}
+```
+
+---
+
 ## Output wiring rules (critical)
 
 An **output** node shows the value from its **direct upstream** neighbor(s). The executor prefers **AI text** over calculator numbers when both are connected.
