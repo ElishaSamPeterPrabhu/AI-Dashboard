@@ -134,38 +134,121 @@ Summarize plan: {{totalProjectHours}} hrs, cost {{totalDevCost}}, breakdown {{fr
 
 ## Layout
 
-Single-lane x: trigger=40, inputs=260, database=500, calc=740, ai=1020, output=1300. Skip unused stages.
+### X axis — stage columns (fixed, skip unused)
 
-Multi-lane: Lane A y≈80, Lane B y≈360. Both feed a `connector`, then combined calc → chart → output. Siblings 130px apart vertically.
+| Stage | x |
+|-------|---|
+| trigger | 40 |
+| inputs / database / assumption | 240 |
+| calculator (first set) | 500 |
+| calculator (second set) / connector | 740 |
+| ai | 1020 |
+| output / chart | 1280 |
 
-**Frames (`type: group`):** For multi-lane or long workflows, add labeled frames first so each section is visually grouped (e.g. `"Inputs"`, `"Calculations"`, `"AI summary"`). Example:
+If a stage is absent, shift every later stage left to close the gap.
+
+### Y axis — stacking nodes within a column
+
+**Each node in a column is 110 px below the previous one.** Start the first node at y = 80 (or the vertical center of the lane).
 
 ```
-add_node { id: "calcFrame", type: "group", position: { x: 220, y: 50 }, data: { label: "Hour & cost calculations" } }
+first node  → y = 80
+second node → y = 190
+third node  → y = 300
+fourth node → y = 410
+fifth node  → y = 520
 ```
 
-Place executable nodes inside the frame's visual area (same x/y band). Sticky notes optional for assumptions or demo disclaimers.
+For columns with N nodes, the column spans from y = 80 to y = 80 + (N−1)×110.
 
-`ai` nodes need ≥280px gap to the right. **Add ai only when user asks for narrative/summary** — each adds ~20s runtime.
+**Center single nodes**: if a stage has only one node but the adjacent column has many, vertically center it: `y = 80 + ((N_neighbors − 1) × 110) / 2`.
+
+### Frames (`type: group`)
+
+Size each frame to wrap its contents with 20 px padding on all sides.
+
+```
+frame x      = column_x − 20
+frame y      = 60              (always start 20px above the first node at y=80)
+frame width  = 160             (nodes are 160px wide; add 40 for padding → 200)
+frame height = (N_nodes − 1) × 110 + 130   (130 covers single-node height + padding)
+```
+
+Example for a column of 4 nodes (y=80…410):
+```json
+{ "id": "inputsFrame", "type": "group",
+  "position": { "x": 220, "y": 60 },
+  "data": { "label": "Inputs" },
+  "width": 200, "height": 410 }
+```
+
+**Add frames before executable nodes** so they render behind them.
+
+### Multi-column (comparison) workflows
+
+When the user wants to compare N options side-by-side (e.g. transport modes, scenarios):
+
+- Give each option its own vertical stack at a **different x** column
+- Stack option nodes top-to-bottom in that column, starting at y = 80
+- All stacks feed a `connector` at x = connector_x, y = center of all stacks
+- Downstream calc → chart → output continue to the right of the connector
+
+```
+x=240  x=460  x=680   x=920 (connector)  x=1160 (calc)  x=1400 (output)
+```
+
+### Full worked example — 4 inputs, 4 cost nodes, 6 calculators
+
+```
+Inputs (x=240)          Cost Assumptions (x=460)    Monthly Costs (x=700)
+y=80  distance          y=80  busCost               y=80  walkingCost (calc)
+y=190 workingDays       y=190 autoCost               y=190 cyclingCost (calc)
+y=300 officeLocation    y=300 motorbikeCost          y=300 publicTransportCost (calc)
+y=410 homeLocation      y=410 carCost               y=410 autoRickshawCost (calc)
+                                                     y=520 motorbikeMonthlyCost (calc)
+                                                     y=630 carMonthlyCost (calc)
+
+AI summary (x=1020, y=355 — centered on 6-node column)
+Output (x=1280, y=355)
+```
+
+Frames:
+```
+inputsFrame:       x=220, y=60,  width=200, height=410
+costFrame:         x=440, y=60,  width=200, height=410
+calcFrame:         x=680, y=60,  width=200, height=630
+summaryFrame:      x=1000, y=60, width=200, height=160
+```
+
+`ai` nodes need ≥280px gap to the right of the previous stage. **Add ai only when user asks for narrative/summary** — each adds ~20s runtime.
 
 ---
 
 ## Example: Flight Tracking App Plan
 
-```
-add_node calcFrame (group, label: "Calculations")
-add_node summaryFrame (group, label: "Summary")
+Nodes per column: 3 inputs, 1 database, 3 calculators, 1 ai, 1 output.
 
-trigger → feHours, beHours, testHours (inputs)
-       → hourlyRate (database)
-       → totalDevHours (calc: feHours + beHours + testHours)
-       → totalProjectHours (calc: totalDevHours * 1.2)
-       → totalDevCost (calc: totalDevHours * hourlyRate)
-       → appDescription (ai: "Summarize {{totalProjectHours}} hrs, ${{totalDevCost}}, FE/BE/test {{feHours}}/{{beHours}}/{{testHours}}.")
-       → projectSummary (output)   ← ONLY edge into projectSummary
+```
+Inputs (x=240)            Database (x=460)     Calculators (x=700)       AI (x=1020)    Output (x=1280)
+y=80  feHours             y=190 hourlyRate      y=80  totalDevHours        y=190 appDesc  y=190 projectSummary
+y=190 beHours             (centered)            y=190 totalProjectHours
+y=300 testHours                                 y=300 totalDevCost
+
+Frames:
+  inputsFrame:  x=220, y=60, width=200, height=300
+  calcFrame:    x=680, y=60, width=200, height=300
+  summaryFrame: x=1000, y=60, width=290, height=160
+
+Edges:
+  trigger → feHours, beHours, testHours, hourlyRate
+  feHours + beHours + testHours → totalDevHours  (formula: feHours + beHours + testHours)
+  totalDevHours → totalProjectHours              (formula: totalDevHours * 1.2)
+  totalDevHours + hourlyRate → totalDevCost      (formula: totalDevHours * hourlyRate)
+  totalDevCost + totalProjectHours + feHours + beHours + testHours → appDesc (ai)
+  appDesc → projectSummary (output) ← ONLY edge into projectSummary
 ```
 
-Optional: `totalDevCost → costOutput (output)` for the number alone. Optional sticky for `"Rates illustrative — adjust in inputs"`.
+Optional: `totalDevCost → costOutput (output, x=1280, y=300)` for the number alone.
 
 ---
 
