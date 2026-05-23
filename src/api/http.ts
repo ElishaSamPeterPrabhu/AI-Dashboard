@@ -1,11 +1,32 @@
-export const apiBase = (): string =>
-  (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+import { getStoredToken } from "@/auth/tid";
+
+/** Set from ?apiBase= when embedded inside Assist MCP App (Amplify may lack VITE_API_BASE). */
+let runtimeApiBase = "";
+
+export function setRuntimeApiBase(base: string): void {
+  runtimeApiBase = base.replace(/\/$/, "");
+}
+
+export const apiBase = (): string => {
+  if (runtimeApiBase) return runtimeApiBase;
+  return (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+};
 
 const url = (path: string) =>
   `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`;
 
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const token = getStoredToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
-  const r = await fetch(url(path), { credentials: "include" });
+  const r = await fetch(url(path), {
+    credentials: "include",
+    headers: authHeaders(),
+  });
   if (!r.ok) throw new Error(await r.text());
   return r.json() as Promise<T>;
 }
@@ -13,7 +34,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(url(path), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(body),
   });
@@ -37,7 +58,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 export async function apiPatch(path: string, body: unknown): Promise<void> {
   const r = await fetch(url(path), {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(body),
   });

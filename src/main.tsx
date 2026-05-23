@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { ModusWcThemeProvider, setAssetPath } from "@trimble-oss/moduswebcomponents-react";
+import { setRuntimeApiBase } from "@/api/http";
 import App from "./App";
 
 // Modus stylesheet (Open Sans + theme tokens)
@@ -12,6 +13,10 @@ import "./shadow-dom-patch";
 if (typeof window !== "undefined") {
   const base = import.meta.env.BASE_URL || "/";
   setAssetPath(`${window.location.origin}${base.endsWith("/") ? base : `${base}/`}`);
+
+  const params = new URLSearchParams(window.location.search);
+  const embedApiBase = params.get("apiBase");
+  if (embedApiBase) setRuntimeApiBase(embedApiBase);
 }
 
 createRoot(document.getElementById("root")!).render(
