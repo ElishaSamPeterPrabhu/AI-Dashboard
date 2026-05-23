@@ -64,7 +64,13 @@ function normalizeIncomingNode(raw: Record<string, unknown>): WfNode {
     raw.data && typeof raw.data === "object" && !Array.isArray(raw.data)
       ? (raw.data as Record<string, unknown>)
       : {};
-  return { id, type, position, data };
+  const node: WfNode = { id, type, position, data };
+  if (typeof raw.width === "number") node.width = raw.width;
+  if (typeof raw.height === "number") node.height = raw.height;
+  if (typeof raw.parentId === "string" && raw.parentId.trim())
+    node.parentId = raw.parentId.trim();
+  if (typeof raw.extent === "string") node.extent = raw.extent;
+  return node;
 }
 
 @Injectable()

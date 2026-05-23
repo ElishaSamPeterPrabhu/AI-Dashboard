@@ -8,6 +8,11 @@ export type WfNode = {
   type?: string;
   position?: { x: number; y: number };
   data?: Record<string, unknown>;
+  width?: number;
+  height?: number;
+  parentId?: string;
+  extent?: string;
+  style?: Record<string, unknown>;
 };
 
 export type WfEdge = {

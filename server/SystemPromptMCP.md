@@ -178,22 +178,40 @@ For columns with N nodes, the column spans from y = 80 to y = 80 + (N−1)×110.
 
 ### Frames (`type: group`)
 
-Size each frame to wrap its contents with 20 px padding on all sides.
+**`width` and `height` are required top-level fields** (not inside `data`). Without them the frame renders as a tiny box in the corner.
+
+Formula to size each frame to wrap its column with 20 px padding:
 
 ```
 frame x      = column_x − 20
 frame y      = 60              (always start 20px above the first node at y=80)
-frame width  = 160             (nodes are 160px wide; add 40 for padding → 200)
+frame width  = 200             (nodes are 160px wide; 40px padding → 200)
 frame height = (N_nodes − 1) × 110 + 130   (130 covers single-node height + padding)
 ```
 
-Example for a column of 4 nodes (y=80…410):
+**Always pass `width` and `height` as top-level properties of the node object**, not inside `data`:
+
 ```json
-{ "id": "inputsFrame", "type": "group",
+{
+  "id": "inputsFrame",
+  "type": "group",
   "position": { "x": 220, "y": 60 },
-  "data": { "label": "Inputs" },
-  "width": 200, "height": 410 }
+  "width": 200,
+  "height": 410,
+  "data": { "label": "Inputs" }
+}
 ```
+
+Examples by node count:
+
+| N nodes in column | frame height |
+|-------------------|-------------|
+| 1 | 130 |
+| 2 | 240 |
+| 3 | 350 |
+| 4 | 460 |
+| 5 | 570 |
+| 6 | 680 |
 
 **Add frames before executable nodes** so they render behind them.
 
