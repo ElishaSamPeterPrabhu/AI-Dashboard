@@ -70,6 +70,8 @@ function normalizeIncomingNode(raw: Record<string, unknown>): WfNode {
   if (typeof raw.parentId === "string" && raw.parentId.trim())
     node.parentId = raw.parentId.trim();
   if (typeof raw.extent === "string") node.extent = raw.extent;
+  if (raw.style && typeof raw.style === "object" && !Array.isArray(raw.style))
+    node.style = raw.style as Record<string, unknown>;
   return node;
 }
 
@@ -525,6 +527,9 @@ window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/ready', params: {} }, '*
         id: n.id,
         type: n.type,
         position: n.position,
+        ...(n.width != null ? { width: n.width } : {}),
+        ...(n.height != null ? { height: n.height } : {}),
+        ...(n.parentId ? { parentId: n.parentId } : {}),
         data: {
           label: n.data?.label,
           value: n.data?.value,
