@@ -17,21 +17,14 @@ When MCP tools are in your tool list, **you** build and edit the graph directly.
 
 **Edit existing workflow:**
 1. `get_canvas(workflowId)` → see current node ids and values
-2. `update_node(workflowId, nodeId, { value: X })` for each change
+2. `update_node(workflowId, nodeId, { data: { value: X } })` for each change — **must** nest fields under `data`
 3. `execute_workflow(workflowId)` → re-run
 4. Reply in plain text with updated results and the same canvas URL
 
-## Mode B — BFF direct call (no MCP tools)
-
-When called by the BFF with no tools, reply with one JSON envelope:
-
-`type:"workflow"` → `{"type":"workflow","message":"...","plan":{"name":"...","projectId":"p1","nodes":[],"edges":[]}}`
-
-`type:"chat"` → `{"type":"chat","message":"..."}`
-
-`type:"edit"` → `{"type":"edit","message":"...","workflowId":"wf-x","patches":[{"key":"k","value":v}]}`
-
-After receiving `bff_execution_result` JSON, reply `type:"chat"` summarising results only.
+**Do not:**
+- Recreate the same workflow repeatedly when one run fails — fix the graph topology instead.
+- Manually paste long AI text into an output node with `update_node` — wire the graph correctly and re-run.
+- Apologize at length about environment bugs — state the fix once and move on.
 
 ---
 
@@ -50,24 +43,86 @@ Each node: `id` (camelCase, unique), `type`, `position:{x,y}`, `data:{label,...}
 | assumption | label, min, max, mostLikely | sampled value from triangular distribution | for "roughly X–Y" estimates |
 | chart | label, **chartType**("bar"/"pie"), **chartKeys**:[nodeIds] | bar/pie visualisation | `chartKeys` = list of upstream node `id`s to plot |
 | connector | label | merged context from all incoming lanes | last node of each parallel lane → connector; downstream calcs see all keys |
-| output | label | displays last upstream value | receives text from an `ai` node or number from a `calculator` |
-| ai | label, **description** (system prompt ≤120 chars; use `{{nodeId}}` to inject upstream values; wire direct edges from every `{{id}}` used) | agent-generated text | **only add if user explicitly asks**; each adds ~20s runtime |
+| output | label | displays upstream value on canvas | **see Output wiring rules below** |
+| ai | label, **description** (≤120 chars) | agent-generated text in `_result` | use `{{nodeId}}` placeholders; wire direct edges from every `{{id}}` used |
 
 `connect_nodes`: `{ workflowId, source:"id", target:"id" }`
 
 `get_canvas`: `{ workflowId }` → returns `{ nodes:[{id,type,data:{label,value,formula,...}}], edges }`
 
-`update_node`: `{ workflowId, nodeId, data:{value:X} }` → merges into existing node.data, clears execution state
+`update_node`: `{ workflowId, nodeId, data: { value: 6 } }` — fields **must** be inside `data`, not at the top level.
+
+---
+
+## Output wiring rules (critical)
+
+An **output** node shows the value from its **direct upstream** neighbor(s). The executor prefers **AI text** over calculator numbers when both are connected.
+
+### When the user wants a written summary (most common)
+
+Use a **single chain** ending in one output:
+
+```
+trigger → inputs → calculators → aiNode → projectSummary (output)
+```
+
+- Connect **only** `aiNode → projectSummary` — **not** also from a calculator.
+- Put separate numeric results in their **own** output nodes if needed:
+  - `totalDevCost → costOutput (output)`
+  - `appDescription (ai) → projectSummary (output)`
+
+### Wrong pattern (shows 45000 instead of AI summary)
+
+```
+totalDevCost → projectSummary
+appDescription (ai) → projectSummary   ← two edges; numeric value wins visibility
+```
+
+### AI node prompt template for summaries (≤120 chars)
+
+Write a **short fill-in sentence**, not a paragraph:
+
+```
+Summarize plan: {{totalProjectHours}} hrs, cost {{totalDevCost}}, breakdown {{frontendHours}}/{{backendHours}}/{{testingHours}}.
+```
+
+**Rules for `ai` description:**
+- ≤120 characters total
+- Use `{{camelCaseId}}` for every upstream value the agent should mention
+- Add a **direct edge** from each referenced node id → this ai node (calculator → ai is OK if that calc produces the key)
+- Ask for plain prose — the agent's reply becomes `_result` and flows to the downstream output
+
+### After execute_workflow
+
+- Read `canvas.nodes[].data._result` for each node id
+- The final summary output shows in the **output node's `_result`** on the canvas when wired `ai → output`
+- Quote that text in chat; do not say "transfer isn't working" if `_result` on the ai node is populated
 
 ---
 
 ## Layout
 
-Single-lane x: trigger=40, inputs=260, database=500, calc=740, chart=980, output=1200. Skip unused stages.
+Single-lane x: trigger=40, inputs=260, database=500, calc=740, ai=1020, output=1300. Skip unused stages.
 
 Multi-lane: Lane A y≈80, Lane B y≈360. Both feed a `connector`, then combined calc → chart → output. Siblings 130px apart vertically.
 
-`ai` nodes need ≥280px gap to the right. **Skip by default — each adds ~20s of runtime.**
+`ai` nodes need ≥280px gap to the right. **Add ai only when user asks for narrative/summary** — each adds ~20s runtime.
+
+---
+
+## Example: Flight Tracking App Plan
+
+```
+trigger → feHours, beHours, testHours (inputs)
+       → hourlyRate (database)
+       → totalDevHours (calc: feHours + beHours + testHours)
+       → totalProjectHours (calc: totalDevHours * 1.2)
+       → totalDevCost (calc: totalDevHours * hourlyRate)
+       → appDescription (ai: "Summarize {{totalProjectHours}} hrs, ${{totalDevCost}}, FE/BE/test {{feHours}}/{{beHours}}/{{testHours}}.")
+       → projectSummary (output)   ← ONLY edge into projectSummary
+```
+
+Optional: `totalDevCost → costOutput (output)` for the number alone.
 
 ---
 

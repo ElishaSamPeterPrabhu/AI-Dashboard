@@ -10,7 +10,11 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 import type { AgentRunRequest, AgentRunResult } from "@/types/agent";
-import { assembleInputContext, routeAgentOutputs } from "@/utils/workflowContext";
+import {
+  assembleInputContext,
+  resolveOutputValue,
+  routeAgentOutputs,
+} from "@/utils/workflowContext";
 import { liveAgentRun, simulateAgentRun, useLiveAgents } from "@/utils/agentRun";
 
 export type CanvasMode = "plan" | "execute";
@@ -238,7 +242,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       animateEdges(inEdgeIds, false);
 
       const aiTypes = new Set(["ai", "connector"]);
-      const nonAi = batch.filter((n) => !aiTypes.has(n.type ?? ""));
+      const nonAi = batch.filter(
+        (n) => !aiTypes.has(n.type ?? "") && n.type !== "output"
+      );
+      const outputNodes = batch.filter((n) => n.type === "output");
       const aiNodes = batch.filter((n) => n.type === "ai");
       // Only run Connector nodes that have at least one incoming edge
       const connectorNodes = batch.filter(
@@ -298,17 +305,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
               _result: displayValue,
               _resultRaw: rawValue,
             });
-          } else if (n.type === "output") {
-            // Output node: pull value from the first upstream node's result
-            const nodesNow = get().nodes;
-            const edgesNow = get().edges;
-            const ctx = assembleInputContext(n.id, nodesNow, edgesNow);
-            const firstVal = Object.values(ctx).find((v) => v != null);
-            const result = firstVal != null ? String(firstVal) : null;
-            patchNodes([n.id], {
-              executionState: "done" as ExecState,
-              ...(result != null ? { _result: result, value: result } : {}),
-            });
           } else if (n.type === "chart") {
             // Chart node: collect upstream context and pick keys to plot
             const nodesNow = get().nodes;
@@ -360,6 +356,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         for (const n of connectorNodes) {
           if (_aborted) break;
           await runConnectorNode(n, get, patchNodes);
+        }
+      }
+
+      // 3e. Output nodes — after AI/connector so upstream AI _result is available
+      if (!_aborted && outputNodes.length > 0) {
+        for (const n of outputNodes) {
+          if (_aborted) break;
+          const nodesNow = get().nodes;
+          const edgesNow = get().edges;
+          const result = resolveOutputValue(n.id, nodesNow, edgesNow);
+          patchNodes([n.id], {
+            executionState: "done" as ExecState,
+            ...(result != null ? { _result: result, value: result } : {}),
+          });
         }
       }
 

@@ -144,6 +144,41 @@ export function assembleInputContext(
   return inputContext;
 }
 
+/** Resolve display value for an output node (call after AI nodes in the same batch). */
+export function resolveOutputValue(
+  outputId: string,
+  nodes: WfNode[],
+  edges: WfEdge[]
+): string | null {
+  const incoming = edges.filter((e) => e.target === outputId);
+  if (incoming.length === 0) return null;
+
+  for (const e of incoming) {
+    const src = nodes.find((n) => n.id === e.source);
+    if (!src || src.type !== "ai") continue;
+    const v = valueForContextFromNode(src);
+    if (v != null && v !== "") return String(v);
+  }
+
+  if (incoming.length === 1) {
+    const src = nodes.find((n) => n.id === incoming[0]!.source);
+    if (!src) return null;
+    const v = valueForContextFromNode(src);
+    return v != null && v !== "" ? String(v) : null;
+  }
+
+  let best: string | null = null;
+  for (const e of incoming) {
+    const src = nodes.find((n) => n.id === e.source);
+    if (!src) continue;
+    const v = valueForContextFromNode(src);
+    if (v == null || v === "") continue;
+    const s = String(v);
+    if (best == null || s.length > best.length) best = s;
+  }
+  return best;
+}
+
 export type NodeDataPatch = Record<string, unknown>;
 
 export function patchNodesData(

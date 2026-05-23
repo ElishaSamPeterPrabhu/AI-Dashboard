@@ -14,6 +14,7 @@ import { TrimbleAgentsService } from "../agents/agents.service";
 import {
   assembleInputContext,
   patchNodesData,
+  resolveOutputValue,
   routeAgentOutputs,
   topologicalBatches,
   type WfEdge,
@@ -107,7 +108,7 @@ export class PlannerService {
       },
       {
         name: "connect_nodes",
-        description: "Add a directed edge between two node ids on a workflow canvas.",
+        description: "Add a directed edge between two node ids. For summaries wire ai → output only (not calculator + ai → same output).",
         inputSchema: {
           type: "object",
           properties: {
@@ -147,7 +148,7 @@ export class PlannerService {
       {
         name: "update_node",
         description:
-          "Patch data fields on an existing node (e.g. change an input value or formula). Does not change node type or position. Call execute_workflow afterwards to re-run with updated values.",
+          "Patch data fields on an existing node: { workflowId, nodeId, data: { value } }. Nest fields under data. Use for inputs/calculators — not to paste AI text into outputs. Call execute_workflow after.",
         inputSchema: {
           type: "object",
           properties: {
@@ -251,7 +252,10 @@ export class PlannerService {
       );
 
       const aiTypes = new Set(["ai", "connector"]);
-      const nonAi = batch.filter((n) => !aiTypes.has(n.type ?? ""));
+      const nonAi = batch.filter(
+        (n) => !aiTypes.has(n.type ?? "") && n.type !== "output"
+      );
+      const outputNodes = batch.filter((n) => n.type === "output");
       const aiNodes = batch.filter((n) => n.type === "ai");
       const connectorNodes = batch.filter(
         (n) => n.type === "connector" && edges.some((e) => e.target === n.id)
@@ -292,19 +296,12 @@ export class PlannerService {
               ? (d.value ?? d.executionResult)
               : d.executionResult;
 
-          // output nodes: pull first upstream value when no explicit result is set
-          if (result == null && cur.type === "output") {
-            const upstreamCtx = assembleInputContext(n.id, nodes, edges);
-            const upstreamValues = Object.values(upstreamCtx).filter((v) => v != null);
-            if (upstreamValues.length > 0) result = upstreamValues[upstreamValues.length - 1];
-          }
-
           nodes = patchNodesData(nodes, [n.id], {
             executionState: "done",
             ...(result != null ? { _result: result } : {}),
           });
           if (result != null) doneIds.push(n.id);
-          else if (cur.type === "trigger" || cur.type === "output") doneIds.push(n.id);
+          else if (cur.type === "trigger") doneIds.push(n.id);
         }
       }
 
@@ -406,6 +403,15 @@ export class PlannerService {
         }
         doneIds.push(n.id);
       }
+
+      for (const n of outputNodes) {
+        const result = resolveOutputValue(n.id, nodes, edges);
+        nodes = patchNodesData(nodes, [n.id], {
+          executionState: "done",
+          ...(result != null ? { _result: result, value: result } : {}),
+        });
+        doneIds.push(n.id);
+      }
     }
 
     this.store.saveCanvas(args.workflowId, { nodes, edges });
@@ -458,6 +464,7 @@ export class PlannerService {
 
 <script>
 const UI = '${uiOrigin}';
+const BFF = '${bffOrigin}';
 const PROJECT_ID = 'p1';
 const PRELOAD_ID = '${preloadWorkflowId}';
 let loaded = false;
@@ -466,7 +473,8 @@ function loadWorkflow(workflowId) {
   if (loaded || !workflowId) return;
   loaded = true;
   const frame = document.getElementById('canvas-frame');
-  frame.src = UI + '/projects/' + PROJECT_ID + '/workflows/' + encodeURIComponent(workflowId) + '?embed=1';
+  frame.src = UI + '/projects/' + PROJECT_ID + '/workflows/' + encodeURIComponent(workflowId)
+    + '?embed=1&apiBase=' + encodeURIComponent(BFF);
   frame.style.display = 'block';
   document.getElementById('loading').style.display = 'none';
 }
