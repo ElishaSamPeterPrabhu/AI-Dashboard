@@ -87,26 +87,42 @@ These make the workflow **readable and demo-friendly**. Add them for any non-tri
 
 ---
 
-## Trimble data sources → `database` nodes
+## Trimble data → `database` nodes
 
-When the user mentions Trimble-specific data (live systems, rate cards, location data), represent it as a `database` node. Pre-fill known values where possible; leave blanks for the user to update or for a follow-up Trimble MCP call.
+When the user mentions Trimble product data (Connect, Maps, rates, site, org, AgriData), add a `database` node and pre-fill `entries` from live data when possible.
 
-| User says… | Node id | `entries` to pre-fill |
-|------------|---------|----------------------|
-| "use Trimble Maps distance" | `trimbleMaps` | `[{key:"distanceKm", value:"<ask user or leave 0>"}]` |
-| "our standard labour rates" / "Trimble One rates" | `trimbleRates` | `[{key:"engineerDailyRate", value:""}, {key:"pmDailyRate", value:""}]` |
-| "Trimble Connect project hours" | `connectData` | `[{key:"estimatedHours", value:""}, {key:"projectBudget", value:""}]` |
-| "Trimble Identity / headcount" | `orgData` | `[{key:"teamSize", value:""}, {key:"avgSalary", value:""}]` |
-| "Viewpoint / site data" | `siteData` | `[{key:"siteAreaSqM", value:""}, {key:"materialCostPerSqM", value:""}]` |
-| "Trimble AgriData / field data" | `agriData` | `[{key:"fieldAreaHa", value:""}, {key:"yieldTPerHa", value:""}]` |
+### Tool: `get_trimble_demo_data` (if in your tool list)
 
-**Rules:**
-- Always add a sticky note alongside the database node: `"Values from Trimble [ProductName] — edit if needed."` with `color: "blue"`
-- If the user hasn't provided a value, leave `value: ""` and the calculator referencing it will produce 0 until updated
-- The user can update any entry via `update_node(workflowId, nodeId, { data: { entries: [...] } })` or directly in the canvas editor
-- If the user says "connect to live Trimble data", acknowledge that live MCP data pull is a future capability — for now, add the database node with labelled empty entries so the workflow structure is ready
+Call **before** `add_node` for the database node. Pass only the fields the workflow needs.
 
-**Example — Trimble Connect project cost model:**
+| Param | Required | Values |
+|-------|----------|--------|
+| `product` | yes | `connect`, `maps`, `rates`, `site`, `org`, `agri` |
+| `scenario` | yes* | See table below |
+| `fields` | recommended | Array of field keys — return only what calculators/database need |
+
+\*Pick the scenario that matches the user's workflow.
+
+| User workflow | product | scenario | Suggested `fields` |
+|---------------|---------|----------|-------------------|
+| Flight tracking app plan | `connect` | `flight_tracking_app` | `frontendHours`, `backendHours`, `testingHours`, `hourlyRate`, `projectBudget`, `teamSize` |
+| Highway / civil project | `connect` | `highway_expansion` | `estimatedHours`, `projectBudget`, `teamSize`, `hourlyRate` |
+| Office commute / transport cost | `maps` | `delhi_commute` | `distanceKm`, `workingDaysPerMonth`, `busCostPerTrip`, `autoCostPerTrip`, `motorbikeFuelCostPerKm`, `carFuelCostPerKm` |
+| Mumbai local route | `maps` | `mumbai_local` | same as delhi_commute + `trainCostPerTrip`, `parkingCostPerDay` |
+| US labour / sprint cost | `rates` | `us_engineering_2026` | `engineerDailyRate`, `pmDailyRate`, `qaEngDailyRate` |
+| India labour rates | `rates` | `in_engineering_2026` | `engineerDailyRate`, `pmDailyRate`, `qaEngDailyRate` |
+| Site / material estimate | `site` | `site_block_3` | `siteAreaSqM`, `materialCostPerSqM`, `laborCostPerSqM` |
+| Team capacity | `org` | `civil_bengaluru` | `teamSize`, `avgDailyRate`, `utilizationPct` |
+| Field / crop planning | `agri` | `wheat_punjab` | `fieldAreaHa`, `yieldTPerHa`, `seedCostPerHa`, `fertilizerCostPerHa` |
+
+**After the tool returns:**
+1. Map each key in the response (skip `_meta`) → `entries: [{ key, value }]`
+2. `add_node` with `type: "database"`, `data.description` = node id (camelCase), `data.entries` = mapped entries
+3. Add blue sticky: `"Trimble demo data — edit if needed."` with `color: "blue"`
+
+**If the tool is not available or fails:** add the database node with empty `entries` and the same sticky.
+
+**Example database node after tool call:**
 
 ```json
 {
@@ -117,9 +133,9 @@ When the user mentions Trimble-specific data (live systems, rate cards, location
     "label": "Trimble Connect",
     "description": "connectData",
     "entries": [
-      { "key": "estimatedHours", "value": "320" },
-      { "key": "projectBudget",  "value": "50000" },
-      { "key": "teamSize",       "value": "5" }
+      { "key": "frontendHours", "value": "200" },
+      { "key": "backendHours", "value": "300" },
+      { "key": "hourlyRate", "value": "75" }
     ]
   }
 }

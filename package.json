@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test:ai": "node scripts/test-ai-bff.mjs",
     "test:planner": "node scripts/test-planner-mcp.mjs",
-    "bundle:eb": "bash scripts/bundle-eb.sh"
+    "bundle:eb": "bash scripts/bundle-eb.sh",
+    "generate:trimble-demo": "node scripts/generate-trimble-demo-data.mjs"
   },
   "dependencies": {
     "@trimble-oss/modus-icons": "1.21.0",
