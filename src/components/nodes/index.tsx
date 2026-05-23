@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Handle, Position, NodeResizer, type NodeProps } from "@xyflow/react";
 import {
@@ -62,22 +62,25 @@ function StatusBar({ data }: { data: Record<string, unknown> }) {
 
 /**
  * Shows text truncated to 1 line with ellipsis on the canvas node.
- * A small "⋯" button opens a portal dialog with the full text.
- * Very short text (≤30 chars, single line) shows inline with no button.
- *
- * All hooks are at the top — no early returns before them.
+ * A small "⋯" button opens a portal dialog with the full text when the
+ * content is long, multiline, or visually clamped by the node width.
  */
 function ExpandableNodeText({
   title,
   text,
   variant = "default",
+  expandThreshold = 30,
 }: {
   title: string;
   text: string;
   variant?: "default" | "mono" | "result" | "aiSub";
+  /** Character count above which the expand button is always shown. */
+  expandThreshold?: number;
 }) {
   const dlgTitleId = useId();
+  const previewRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -98,41 +101,59 @@ function ExpandableNodeText({
   }, [open]);
 
   const trimmed = text.trim();
+
+  useLayoutEffect(() => {
+    const el = previewRef.current;
+    if (!el || !trimmed) {
+      setOverflowing(false);
+      return undefined;
+    }
+    const measure = () => {
+      setOverflowing(
+        el.scrollHeight > el.clientHeight + 1 ||
+          el.scrollWidth > el.clientWidth + 1
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [trimmed]);
+
   if (!trimmed) return null;
 
-  // Very short single-line text — show inline, no expand button needed.
-  const dense = trimmed.length <= 30 && !trimmed.includes("\n");
-
-  if (dense) {
-    return (
-      <div
-        className={`nf-expand-preview nf-expand-preview--dense nf-expand-preview--${variant}`}
-        title={trimmed}
-      >
-        {trimmed}
-      </div>
-    );
-  }
+  const needsExpand =
+    trimmed.includes("\n") ||
+    trimmed.length > expandThreshold ||
+    overflowing;
 
   return (
     <>
       <div className={`nf-expand-row nf-expand-row--${variant}`}>
-        <div className={`nf-expand-preview nf-expand-preview--${variant}`}>
+        <div
+          ref={previewRef}
+          className={`nf-expand-preview nf-expand-preview--${variant}${
+            !needsExpand ? " nf-expand-preview--dense" : ""
+          }`}
+          title={!needsExpand ? trimmed : undefined}
+        >
           {trimmed}
         </div>
-        <button
-          type="button"
-          className="nf-expand-more"
-          onClick={(ev) => {
-            ev.stopPropagation();
-            ev.preventDefault();
-            setOpen(true);
-          }}
-          aria-label={`View full ${title}`}
-          title={`View full ${title}`}
-        >
-          &#8943;
-        </button>
+        {needsExpand && (
+          <button
+            type="button"
+            className="nf-expand-more"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              ev.preventDefault();
+              setOpen(true);
+            }}
+            aria-label={`View full ${title}`}
+            title={`View full ${title}`}
+          >
+            &#8943;
+          </button>
+        )}
       </div>
       {open &&
         createPortal(
@@ -315,7 +336,12 @@ export function OutputNode({ data, selected }: NodeProps) {
           <span className="nf-node__label">{d.label || "Result"}</span>
         </div>
         {displayText ? (
-          <ExpandableNodeText title="Output value" text={displayText} variant={variant} />
+          <ExpandableNodeText
+            title={d.label?.trim() || "Output value"}
+            text={displayText}
+            variant={variant}
+            expandThreshold={18}
+          />
         ) : (
           <div className="nf-node__placeholder">Awaiting value</div>
         )}
