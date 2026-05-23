@@ -34,6 +34,8 @@ Each node: `id` (camelCase, unique), `type`, `position:{x,y}`, `data:{label,...}
 
 **Variable name rule:** For `input` and `database` nodes, `data.description` **must equal the node `id`** exactly (e.g. id `dailyCost` → `description: "dailyCost"`). The executor uses this as the formula variable name; if it has spaces it is ignored and calculator formulas silently return empty.
 
+### Execution nodes (wire with `connect_nodes`, included in `execute_workflow`)
+
 | type | required `data` fields | what it produces | notes |
 |------|----------------------|-----------------|-------|
 | trigger | label | nothing (starts the graph) | always first; connect it to every top-level node |
@@ -45,6 +47,27 @@ Each node: `id` (camelCase, unique), `type`, `position:{x,y}`, `data:{label,...}
 | connector | label | merged context from all incoming lanes | last node of each parallel lane → connector; downstream calcs see all keys |
 | output | label | displays upstream value on canvas | **see Output wiring rules below** |
 | ai | label, **description** (≤120 chars) | agent-generated text in `_result` | use `{{nodeId}}` placeholders; wire direct edges from every `{{id}}` used |
+
+### Visual / canvas nodes (layout only — **not executed**, no edges needed)
+
+These make the workflow **readable and demo-friendly**. Add them for any non-trivial graph.
+
+| type | UI label | required `data` | purpose |
+|------|----------|-----------------|---------|
+| **group** | **Frame** | label | Section box / lane title (e.g. `"Frontend"`, `"Cost calculations"`, `"Summary"`). Place **behind** a lane: add the frame first at `{x,y}` spanning the lane, then place executable nodes on top. User can resize in the canvas editor. |
+| sticky | Sticky | text, optional color | Free-form note or legend (assumptions, data sources, "illustrative only"). Does not affect execution. |
+
+**Frame tip for multi-lane workflows:** Add one `group` frame per lane before the lane's inputs/calcs, e.g. `frontendFrame` at y≈40, `backendFrame` at y≈360, `summaryFrame` around the final ai→output chain. Labels help stakeholders scan the canvas quickly.
+
+### Flow nodes (optional — use when the user asks for branching or named steps)
+
+| type | required `data` | notes |
+|------|-----------------|-------|
+| process | label, optional description | Named step / milestone label on the canvas. Can sit between nodes for documentation; wire like any other node if you want it in the execution path. |
+| decision | label, optional trueLabel / falseLabel | Diamond branch point. Use when user asks for if/else or yes/no paths; connect `true` / `false` / `default` handles when branching. |
+| loop | label, optional maxIterations | Visual iterator container (skipped by executor). Prefer calculator + connector patterns for computed totals unless user explicitly wants a loop block. |
+
+**Executor skip list:** `group`, `loop`, and `sticky` never run — do **not** connect data edges through them. Only executable types above participate in `execute_workflow`.
 
 `connect_nodes`: `{ workflowId, source:"id", target:"id" }`
 
@@ -106,6 +129,14 @@ Single-lane x: trigger=40, inputs=260, database=500, calc=740, ai=1020, output=1
 
 Multi-lane: Lane A y≈80, Lane B y≈360. Both feed a `connector`, then combined calc → chart → output. Siblings 130px apart vertically.
 
+**Frames (`type: group`):** For multi-lane or long workflows, add labeled frames first so each section is visually grouped (e.g. `"Inputs"`, `"Calculations"`, `"AI summary"`). Example:
+
+```
+add_node { id: "calcFrame", type: "group", position: { x: 220, y: 50 }, data: { label: "Hour & cost calculations" } }
+```
+
+Place executable nodes inside the frame's visual area (same x/y band). Sticky notes optional for assumptions or demo disclaimers.
+
 `ai` nodes need ≥280px gap to the right. **Add ai only when user asks for narrative/summary** — each adds ~20s runtime.
 
 ---
@@ -113,6 +144,9 @@ Multi-lane: Lane A y≈80, Lane B y≈360. Both feed a `connector`, then combine
 ## Example: Flight Tracking App Plan
 
 ```
+add_node calcFrame (group, label: "Calculations")
+add_node summaryFrame (group, label: "Summary")
+
 trigger → feHours, beHours, testHours (inputs)
        → hourlyRate (database)
        → totalDevHours (calc: feHours + beHours + testHours)
@@ -122,7 +156,7 @@ trigger → feHours, beHours, testHours (inputs)
        → projectSummary (output)   ← ONLY edge into projectSummary
 ```
 
-Optional: `totalDevCost → costOutput (output)` for the number alone.
+Optional: `totalDevCost → costOutput (output)` for the number alone. Optional sticky for `"Rates illustrative — adjust in inputs"`.
 
 ---
 
