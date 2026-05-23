@@ -412,8 +412,7 @@ async function runAiNode(
       });
       return { status: "error", result: "", errorMessage: msg };
     }
-    try {
-      const body: AgentRunRequest = {
+    const body: AgentRunRequest = {
       nodeId: n.id,
       workflowId: wfId,
       systemPrompt,
