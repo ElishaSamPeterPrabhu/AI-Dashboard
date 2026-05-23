@@ -56,18 +56,62 @@ Adjust org/repo/branch if your fork differs.
 }
 ```
 
-### Products and scenarios
+### Trimble ecosystem — catalog products
 
-| product | scenario keys | Typical use |
-|---------|---------------|-------------|
-| `connect` | `flight_tracking_app`, `highway_expansion` | Project hours, budget, team |
-| `maps` | `delhi_commute`, `mumbai_local` | Distance, commute costs |
-| `rates` | `us_engineering_2026`, `in_engineering_2026` | Daily rate cards |
-| `site` | `site_block_3`, `warehouse_pad_2` | Site area, material/labor $/m² |
-| `org` | `civil_bengaluru`, `transport_delhi` | Headcount, utilization |
-| `agri` | `wheat_punjab` | Field area, yield, costs |
+Each row is a **separate data source** the agent can pull via `get_trimble_demo_data`. Names align with real Trimble lines (Connect CDE, Maps, Viewpoint/site, division org profiles, AgriData).
+
+| Catalog `product` | Trimble product (demo alignment) | Scenario keys | One database node per… |
+|-------------------|----------------------------------|---------------|------------------------|
+| `connect` | **Trimble Connect** — projects, hours, budgets in the CDE | `flight_tracking_app`, `highway_expansion` | **Project** (each scenario = one Connect project record) |
+| `maps` | **Trimble Maps** — routing / distance / commute | `delhi_commute`, `mumbai_local` | **Route / commute profile** |
+| `rates` | **Trimble One** / regional labour benchmarks | `us_engineering_2026`, `in_engineering_2026` | **Rate card** (pick one region per node) |
+| `site` | **Trimble Viewpoint** / field quantities | `site_block_3`, `warehouse_pad_2` | **Job site** |
+| `org` | **Trimble division / org** — headcount & capacity | `civil_bengaluru`, `transport_delhi` | **Org** — use **one scenario per org** as its **own** `database` node |
+| `agri` | **Trimble AgriData** | `wheat_punjab` | **Field / crop pilot** |
 
 All `fields` values are **strings** so they map directly to `database` node `entries[].value`.
+
+### Multi-org simulation — one workflow, separate databases
+
+Typical demo: you talk about **Org A** (e.g. Civil Bengaluru), then **Org B** (e.g. Transportation Delhi), and optionally a **Connect project** owned by one of them. The agent should **not** merge orgs into one database node.
+
+**Pattern:**
+
+```
+trigger
+  ├→ database bengaluruOrg   ← get_trimble_demo_data(org, civil_bengaluru)
+  ├→ database delhiOrg       ← get_trimble_demo_data(org, transport_delhi)
+  └→ database connectProject   ← get_trimble_demo_data(connect, highway_expansion)  [optional]
+        ↓ (each lane: calculator per org, or direct edges)
+     connector mergeContext
+        ↓
+     calculator totalBlendedCost
+        ↓
+     ai → output
+```
+
+**Rules for combined org workflows:**
+
+1. **One tool call → one `database` node** — never mix two orgs in one node.
+2. **Unique entry keys** — org scenarios use prefixed keys (`blrTeamSize`, `delhiTeamSize`) so calculators can reference both without collision.
+3. **Wire both org nodes** into a `connector` (or into one calculator with two incoming edges) before a blended total.
+4. **Connect projects** include `owningOrg` / `owningOrgId` — use them in stickies or AI text to tie project ↔ org in the narrative.
+
+**Example blended calculator** (after connector or dual-edge calc):
+
+```text
+blrTeamSize * blrAvgDailyRate + delhiTeamSize * delhiAvgDailyRate
+```
+
+**Example tool calls for a two-org capacity sim:**
+
+| Step | Call |
+|------|------|
+| 1 | `{ product: "org", scenario: "civil_bengaluru", fields: ["orgName","blrTeamSize","blrAvgDailyRate","blrUtilizationPct"] }` |
+| 2 | `{ product: "org", scenario: "transport_delhi", fields: ["orgName","delhiTeamSize","delhiAvgDailyRate","delhiUtilizationPct"] }` |
+| 3 (optional) | `{ product: "connect", scenario: "highway_expansion", fields: ["projectName","estimatedHours","projectBudget","owningOrg"] }` |
+
+Map each response to its own `database` node (`bengaluruOrg`, `delhiOrg`, `connectProject`) with `data.description` equal to the node id.
 
 ---
 
@@ -163,5 +207,29 @@ return {
   "motorbikeFuelCostPerKm": "2.5",
   "carFuelCostPerKm": "6.67",
   "_meta": { "product": "maps", "scenario": "delhi_commute", "label": "India Gate → Cyber City commute" }
+}
+```
+
+**Two-org sim — Bengaluru org (subset):**
+
+```json
+{
+  "orgName": "Trimble Civil — Bengaluru",
+  "blrTeamSize": "12",
+  "blrAvgDailyRate": "750",
+  "blrUtilizationPct": "82",
+  "_meta": { "product": "org", "scenario": "civil_bengaluru", "label": "Trimble Civil — Bengaluru" }
+}
+```
+
+**Two-org sim — Delhi org (subset):**
+
+```json
+{
+  "orgName": "Transportation — Delhi NCR",
+  "delhiTeamSize": "8",
+  "delhiAvgDailyRate": "680",
+  "delhiUtilizationPct": "88",
+  "_meta": { "product": "org", "scenario": "transport_delhi", "label": "Transportation — Delhi NCR" }
 }
 ```

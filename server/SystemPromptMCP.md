@@ -89,11 +89,13 @@ These make the workflow **readable and demo-friendly**. Add them for any non-tri
 
 ## Trimble data → `database` nodes
 
-When the user mentions Trimble product data (Connect, Maps, rates, site, org, AgriData), add a `database` node and pre-fill `entries` from live data when possible.
+When the user mentions Trimble product data (Connect projects, Maps routes, rate cards, sites, **org/division profiles**, AgriData), add **`database` nodes** and pre-fill `entries` from live data when possible.
+
+**Multi-source demos:** If the user discusses **more than one org, project, or product line**, make **separate `get_trimble_demo_data` calls** and **separate `database` nodes** — then merge with a `connector` or a calculator that has edges from both. Do **not** combine two orgs into one database node.
 
 ### Tool: `get_trimble_demo_data` (if in your tool list)
 
-Call **before** `add_node` for the database node. Pass only the fields the workflow needs.
+Call **before each** `add_node` for a database node. Pass only the fields that workflow needs.
 
 | Param | Required | Values |
 |-------|----------|--------|
@@ -101,45 +103,59 @@ Call **before** `add_node` for the database node. Pass only the fields the workf
 | `scenario` | yes* | See table below |
 | `fields` | recommended | Array of field keys — return only what calculators/database need |
 
-\*Pick the scenario that matches the user's workflow.
+\*Pick the scenario that matches the user's workflow. For two-org sims, call twice with different `scenario` values.
 
 | User workflow | product | scenario | Suggested `fields` |
 |---------------|---------|----------|-------------------|
-| Flight tracking app plan | `connect` | `flight_tracking_app` | `frontendHours`, `backendHours`, `testingHours`, `hourlyRate`, `projectBudget`, `teamSize` |
-| Highway / civil project | `connect` | `highway_expansion` | `estimatedHours`, `projectBudget`, `teamSize`, `hourlyRate` |
+| Flight tracking app plan | `connect` | `flight_tracking_app` | `projectName`, `frontendHours`, `backendHours`, `testingHours`, `hourlyRate`, `projectBudget`, `owningOrg` |
+| Highway / civil project | `connect` | `highway_expansion` | `projectName`, `estimatedHours`, `projectBudget`, `teamSize`, `hourlyRate`, `owningOrg` |
 | Office commute / transport cost | `maps` | `delhi_commute` | `distanceKm`, `workingDaysPerMonth`, `busCostPerTrip`, `autoCostPerTrip`, `motorbikeFuelCostPerKm`, `carFuelCostPerKm` |
 | Mumbai local route | `maps` | `mumbai_local` | same as delhi_commute + `trainCostPerTrip`, `parkingCostPerDay` |
 | US labour / sprint cost | `rates` | `us_engineering_2026` | `engineerDailyRate`, `pmDailyRate`, `qaEngDailyRate` |
 | India labour rates | `rates` | `in_engineering_2026` | `engineerDailyRate`, `pmDailyRate`, `qaEngDailyRate` |
 | Site / material estimate | `site` | `site_block_3` | `siteAreaSqM`, `materialCostPerSqM`, `laborCostPerSqM` |
-| Team capacity | `org` | `civil_bengaluru` | `teamSize`, `avgDailyRate`, `utilizationPct` |
+| Org A — Civil Bengaluru | `org` | `civil_bengaluru` | `orgName`, `blrTeamSize`, `blrAvgDailyRate`, `blrUtilizationPct` |
+| Org B — Transportation Delhi | `org` | `transport_delhi` | `orgName`, `delhiTeamSize`, `delhiAvgDailyRate`, `delhiUtilizationPct` |
+| **Two-org blended capacity sim** | `org` | **both rows above** | Two tool calls → `bengaluruOrg` + `delhiOrg` database nodes → connector → `blrTeamSize * blrAvgDailyRate + delhiTeamSize * delhiAvgDailyRate` |
 | Field / crop planning | `agri` | `wheat_punjab` | `fieldAreaHa`, `yieldTPerHa`, `seedCostPerHa`, `fertilizerCostPerHa` |
 
-**After the tool returns:**
+**After each tool returns:**
 1. Map each key in the response (skip `_meta`) → `entries: [{ key, value }]`
-2. `add_node` with `type: "database"`, `data.description` = node id (camelCase), `data.entries` = mapped entries
+2. `add_node` with `type: "database"`, unique camelCase `id` (e.g. `bengaluruOrg`, `delhiOrg`), `data.description` = same id, `data.entries` = mapped entries
 3. Add blue sticky: `"Trimble demo data — edit if needed."` with `color: "blue"`
 
 **If the tool is not available or fails:** add the database node with empty `entries` and the same sticky.
 
-**Example database node after tool call:**
+**Example — single Connect database node:**
 
 ```json
 {
-  "id": "connectData",
+  "id": "connectProject",
   "type": "database",
   "position": { "x": 460, "y": 80 },
   "data": {
     "label": "Trimble Connect",
-    "description": "connectData",
+    "description": "connectProject",
     "entries": [
-      { "key": "frontendHours", "value": "200" },
-      { "key": "backendHours", "value": "300" },
-      { "key": "hourlyRate", "value": "75" }
+      { "key": "projectName", "value": "Highway 47 Expansion" },
+      { "key": "estimatedHours", "value": "3200" },
+      { "key": "projectBudget", "value": "2400000" },
+      { "key": "owningOrg", "value": "Transportation — Delhi NCR" }
     ]
   }
 }
 ```
+
+**Example — two org nodes in one workflow (separate lanes, merge at connector):**
+
+```json
+{ "id": "bengaluruOrg", "type": "database", "data": { "label": "Org — Bengaluru", "description": "bengaluruOrg",
+  "entries": [{ "key": "blrTeamSize", "value": "12" }, { "key": "blrAvgDailyRate", "value": "750" }] } }
+{ "id": "delhiOrg", "type": "database", "data": { "label": "Org — Delhi NCR", "description": "delhiOrg",
+  "entries": [{ "key": "delhiTeamSize", "value": "8" }, { "key": "delhiAvgDailyRate", "value": "680" }] } }
+```
+
+Wire `bengaluruOrg` and `delhiOrg` → `connector` → calculator with formula `blrTeamSize * blrAvgDailyRate + delhiTeamSize * delhiAvgDailyRate`.
 
 ---
 
