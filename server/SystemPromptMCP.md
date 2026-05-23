@@ -25,6 +25,7 @@ When MCP tools are in your tool list, **you** build and edit the graph directly.
 - Recreate the same workflow repeatedly when one run fails — fix the graph topology instead.
 - Manually paste long AI text into an output node with `update_node` — wire the graph correctly and re-run.
 - Apologize at length about environment bugs — state the fix once and move on.
+- **Write AI node descriptions that allow the agent to ask follow-up questions.** Every `ai` node description must close with a directive like `"State facts only. No questions."` so the agent produces a self-contained answer.
 
 ---
 
@@ -122,7 +123,19 @@ Summarize plan: {{totalProjectHours}} hrs, cost {{totalDevCost}}, breakdown {{fr
 - ≤120 characters total
 - Use `{{camelCaseId}}` for every upstream value the agent should mention
 - Add a **direct edge** from each referenced node id → this ai node (calculator → ai is OK if that calc produces the key)
-- Ask for plain prose — the agent's reply becomes `_result` and flows to the downstream output
+- End the description with: **`State facts only. No questions. No offers of further help.`**
+- The agent's reply becomes `_result` and flows to the downstream output — it must be a complete self-contained statement
+
+**Critical — the AI node must never:**
+- End with "Would you like…?", "Do you want…?", "Shall I…?", or any question
+- Offer recommendations conditional on unstated preferences
+- Say "not specified" or "generally" — only report values that are in the upstream context
+
+**Enforce this by ending every `ai` description with a closing directive**, e.g.:
+
+```
+Cheapest option from {{walkCost}}/{{bikeCost}}/{{busCost}}/{{autoCost}}/{{motorbikeCost}}/{{carCost}}. State the winner and all costs. No questions.
+```
 
 ### After execute_workflow
 
