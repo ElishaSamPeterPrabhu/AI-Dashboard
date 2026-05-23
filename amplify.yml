@@ -6,6 +6,8 @@ frontend:
         - npm ci
     build:
       commands:
+        # Set VITE_API_BASE in Amplify Console → Environment variables (CloudFront BFF URL, no trailing slash).
+        # Assist embed also passes ?apiBase= from MCP App HTML when VITE_API_BASE is unset.
         - npm run build
   artifacts:
     baseDirectory: dist
