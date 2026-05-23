@@ -55,7 +55,16 @@ These make the workflow **readable and demo-friendly**. Add them for any non-tri
 | type | UI label | required `data` | purpose |
 |------|----------|-----------------|---------|
 | **group** | **Frame** | label | Section box / lane title (e.g. `"Frontend"`, `"Cost calculations"`, `"Summary"`). Place **behind** a lane: add the frame first at `{x,y}` spanning the lane, then place executable nodes on top. User can resize in the canvas editor. |
-| sticky | Sticky | text, optional color | Free-form note or legend (assumptions, data sources, "illustrative only"). Does not affect execution. |
+| **sticky** | **Sticky** | **text**, optional **color** | Free-form note or legend — assumptions, data sources, caveats ("illustrative only"), or demo context. Does **not** affect execution; no edges needed. `color` accepts: `"yellow"` (default), `"blue"`, `"green"`, `"pink"`, `"purple"`. |
+
+**Sticky examples:**
+
+```json
+{ "id": "note1", "type": "sticky", "position": { "x": 40, "y": 420 },
+  "data": { "text": "Rates are illustrative — edit Inputs to adjust.", "color": "blue" } }
+{ "id": "note2", "type": "sticky", "position": { "x": 800, "y": -60 },
+  "data": { "text": "AI summary adds ~20s. Disable if not needed.", "color": "yellow" } }
+```
 
 **Frame tip for multi-lane workflows:** Add one `group` frame per lane before the lane's inputs/calcs, e.g. `frontendFrame` at y≈40, `backendFrame` at y≈360, `summaryFrame` around the final ai→output chain. Labels help stakeholders scan the canvas quickly.
 
