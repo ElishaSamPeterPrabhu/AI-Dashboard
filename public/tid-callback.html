@@ -16,8 +16,13 @@
           { type: 'tid-callback', code, state, error },
           window.location.origin
         );
+        setTimeout(function () {
+          window.close();
+        }, 150);
+      } else {
+        document.body.innerHTML =
+          '<p>Sign-in complete. You can close this tab and return to AI Dashboard.</p>';
       }
-      window.close();
     </script>
   </body>
 </html>

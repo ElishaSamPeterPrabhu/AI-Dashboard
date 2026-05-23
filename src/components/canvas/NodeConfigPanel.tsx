@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { type Node } from "@xyflow/react";
 import {
   ModusWcTypography,
@@ -8,8 +8,23 @@ import {
   ModusWcIcon,
   ModusWcSelect,
 } from "@trimble-oss/moduswebcomponents-react";
+import { clearStoredToken, getStoredToken, openTidLogin } from "@/auth/tid";
 import { useCanvasStore } from "@/store/canvasStore";
 import { apiGet, apiPost } from "@/api/http";
+
+const AGENT_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeAgentId(raw: string): string {
+  return raw.trim().replace(/[{}]/g, "");
+}
+
+function validateAgentId(id: string): string | null {
+  if (!AGENT_UUID_RE.test(id)) {
+    return `Invalid agent UUID (${id.length}/36 chars). Paste the full ID from Studio, e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.`;
+  }
+  return null;
+}
 
 // ── Agent binding widget ──────────────────────────────────────────────────────
 
@@ -33,6 +48,51 @@ function AgentBindingWidget({
   const [searchTerm, setSearchTerm] = useState("");
   const [pasteId, setPasteId] = useState("");
   const [pasteLoading, setPasteLoading] = useState(false);
+  const [signedIn, setSignedIn] = useState(() => Boolean(getStoredToken()));
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [agentBaseUrl, setAgentBaseUrl] = useState<string | null>(null);
+  const signInLabelRef = useRef<HTMLSpanElement>(null);
+
+  const refreshAuth = () => {
+    const ok = Boolean(getStoredToken());
+    setSignedIn(ok);
+    if (!ok) setAuthError("");
+  };
+
+  useEffect(() => {
+    refreshAuth();
+    window.addEventListener("focus", refreshAuth);
+    void apiGet<{ agentBaseUrl?: string | null }>("/api/health")
+      .then((h) => setAgentBaseUrl(h.agentBaseUrl ?? null))
+      .catch(() => setAgentBaseUrl(null));
+    return () => window.removeEventListener("focus", refreshAuth);
+  }, []);
+
+  useEffect(() => {
+    if (signInLabelRef.current) {
+      signInLabelRef.current.textContent = authBusy ? "Signing in…" : "Sign in with Trimble";
+    }
+  }, [authBusy]);
+
+  const signIn = async () => {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      await openTidLogin();
+      setSignedIn(true);
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const signOut = () => {
+    clearStoredToken();
+    setSignedIn(false);
+    setAuthError("");
+  };
 
   const provision = async () => {
     setLoading(true);
@@ -52,44 +112,59 @@ function AgentBindingWidget({
 
   const fetchAgents = async (search?: string) => {
     setPickLoading(true);
+    setError("");
     try {
+      if (!getStoredToken()) {
+        setError("Sign in required to browse agents.");
+        setAgents([]);
+        return;
+      }
       const url = search?.trim() ? `/api/agents?search=${encodeURIComponent(search)}` : "/api/agents";
       const list = await apiGet<Array<{ id: string; name: string; description?: string }>>(url);
       setAgents(list);
-    } catch {
+      if (list.length === 0) {
+        setError("No agents found for your account. Paste an agent ID from Studio instead.");
+      }
+    } catch (e) {
       setAgents([]);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setPickLoading(false);
     }
   };
 
-  const openPicker = async () => {
+  const openPicker = () => {
     setShowPicker(true);
     setSearchTerm("");
     setPasteId("");
+    setAgents([]);
+    setError("");
+  };
+
+  const browseAgents = async () => {
     await fetchAgents();
   };
 
   /** Look up a known agent ID directly (for agents not in the list) */
   const bindById = async () => {
-    const id = pasteId.trim();
+    const id = normalizeAgentId(pasteId);
     if (!id) return;
+    const invalid = validateAgentId(id);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setPasteLoading(true);
     setError("");
+    // Bind immediately so the node is usable; resolve the display name in the background.
+    onBound(id, nodeLabel || id.slice(0, 8));
+    setShowPicker(false);
+    setError("");
     try {
-      // Try to resolve the name from the server
-      const agent = await apiGet<{ id: string; name: string } | null>(`/api/agents/${encodeURIComponent(id)}/info`);
-      if (agent?.id) {
-        onBound(agent.id, agent.name);
-      } else {
-        // Bind anyway — name will be updated when user JWT is active
-        onBound(id, nodeLabel || id.slice(0, 8));
-      }
-      setShowPicker(false);
+      const agent = await apiGet<{ id: string; name: string }>(`/api/agents/${encodeURIComponent(id)}/info`);
+      onBound(agent.id, agent.name);
     } catch {
-      // Network error — bind with ID, name resolves later
-      onBound(id, nodeLabel || id.slice(0, 8));
-      setShowPicker(false);
+      // Trimble docs: do not rely on GET /agents/{id} immediately after bind — run is the real test.
     } finally {
       setPasteLoading(false);
     }
@@ -97,16 +172,57 @@ function AgentBindingWidget({
 
   const isBound = Boolean(agentId);
 
-  // Auto-resolve name when bound but name is a placeholder
+  // Auto-resolve name when bound but name is a placeholder (best-effort; failures are normal)
   useEffect(() => {
-    if (!agentId || (agentName && agentName.length > 12 && agentName !== agentId)) return;
+    if (!agentId || !signedIn || (agentName && agentName.length > 12 && agentName !== agentId)) return;
     void apiGet<{ id: string; name: string } | null>(`/api/agents/${encodeURIComponent(agentId)}/info`)
       .then((a) => { if (a?.name && a.name !== agentId) onBound(agentId, a.name); })
       .catch(() => {});
-  }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agentId, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-2">
+      {!signedIn ? (
+        <>
+          <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>
+            Sign in to bind or create a Trimble agent for this node.
+          </p>
+          <ModusWcButton
+            variant="filled"
+            color="primary"
+            size="sm"
+            disabled={authBusy}
+            onButtonClick={() => void signIn()}
+          >
+            <ModusWcIcon slot="start" name="account_circle" size="sm" decorative />
+            <span ref={signInLabelRef}>Sign in with Trimble</span>
+          </ModusWcButton>
+          {authError && (
+            <p className="m-0 text-xs" style={{ color: "var(--modus-wc-color-danger)", fontFamily: "system-ui" }}>
+              {authError}
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.35)" }}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <i className="modus-icons" style={{ fontSize: 13, color: "#22c55e" }}>check_circle</i>
+              <span className="text-xs font-semibold text-emerald-400" style={{ fontFamily: "system-ui" }}>Signed in</span>
+            </div>
+            <button
+              type="button"
+              onClick={signOut}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modus-wc-color-base-content-low-contrast)", fontSize: 11, fontFamily: "system-ui", padding: 0 }}
+            >
+              Sign out
+            </button>
+          </div>
+          <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>
+            In Studio → agent → Access, grant app{" "}
+            <span style={{ fontFamily: "monospace" }}>61abccab…</span> (Viewer) so this dashboard can run the agent.
+          </p>
+
       {/* Bound state */}
       {isBound && (
         <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(8,145,178,0.08)", border: "1px solid #0891b2" }}>
@@ -114,23 +230,25 @@ function AgentBindingWidget({
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 11, fontWeight: 600, color: "#0891b2", fontFamily: "system-ui", display: "flex", alignItems: "center", gap: 4 }}>
               {agentName || agentId}
-              {/* If name looks like a placeholder, offer to resolve it */}
               {(!agentName || agentName === agentId || agentName.length <= 12) && (
                 <button
                   onClick={async () => {
                     try {
                       const a = await apiGet<{ id: string; name: string } | null>(`/api/agents/${encodeURIComponent(agentId)}/info`);
                       if (a?.name) onBound(agentId, a.name);
-                    } catch { /* ignore */ }
+                    } catch { /* name lookup optional */ }
                   }}
                   style={{ background: "none", border: "none", cursor: "pointer", color: "#0891b2", fontSize: 9, padding: 0, textDecoration: "underline", fontFamily: "system-ui" }}
-                  title="Fetch agent name from server"
+                  title="Try to fetch agent name from Agent Service"
                 >
                   resolve
                 </button>
               )}
             </div>
             <div style={{ fontSize: 9, color: "var(--modus-wc-color-base-content-low-contrast)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agentId}</div>
+            <div style={{ fontSize: 9, color: "#0891b2", fontFamily: "system-ui", marginTop: 2 }}>
+              Bound — switch to Execute → Run to test the agent.
+            </div>
           </div>
           <button
             onClick={onUnbound}
@@ -153,7 +271,7 @@ function AgentBindingWidget({
             <ModusWcIcon slot="start" name="ai_stars" size="sm" decorative />
             {loading ? "Creating…" : "Auto-create agent"}
           </ModusWcButton>
-          <ModusWcButton variant="outlined" color="tertiary" size="sm" onButtonClick={() => void openPicker()}>
+          <ModusWcButton variant="outlined" color="tertiary" size="sm" onButtonClick={openPicker}>
             <ModusWcIcon slot="start" name="link" size="sm" decorative />
             Bind existing agent
           </ModusWcButton>
@@ -170,14 +288,61 @@ function AgentBindingWidget({
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="m-0 text-xs font-semibold text-[var(--modus-wc-color-base-content-low-contrast)] uppercase tracking-wider" style={{ fontFamily: "system-ui" }}>
-              Your agents
+              Bind agent by ID
             </p>
             <button onClick={() => setShowPicker(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modus-wc-color-base-content-low-contrast)", padding: 2 }}>
               <i className="modus-icons" style={{ fontSize: 13 }}>close</i>
             </button>
           </div>
 
+          <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>
+            Paste the agent UUID from Trimble AI Studio (full 36-character ID).
+            {agentBaseUrl ? (
+              <> Server: <span style={{ fontFamily: "monospace" }}>{agentBaseUrl}</span></>
+            ) : null}
+          </p>
+
+          {/* Paste ID directly */}
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              value={pasteId}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              onChange={(e) => setPasteId(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void bindById(); }}
+              style={{
+                padding: "4px 8px", borderRadius: 6, fontSize: 10, width: "100%", boxSizing: "border-box" as const,
+                border: "1px solid var(--modus-wc-color-base-300)",
+                background: "var(--modus-wc-color-base-100)",
+                color: "var(--modus-wc-color-base-content)",
+                fontFamily: "monospace", outline: "none",
+              }}
+            />
+            <button
+              onClick={() => void bindById()}
+              disabled={!pasteId.trim() || pasteLoading}
+              style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #0891b2", background: "rgba(8,145,178,0.1)", cursor: "pointer", color: "#0891b2", fontSize: 11, fontFamily: "system-ui", fontWeight: 600, alignSelf: "flex-start" }}
+            >
+              {pasteLoading ? "Looking up…" : "Bind this ID"}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2 border-t border-[var(--modus-wc-color-base-300)]">
+            <div className="flex items-center justify-between gap-2">
+              <p className="m-0 text-xs font-semibold text-[var(--modus-wc-color-base-content-low-contrast)] uppercase tracking-wider" style={{ fontFamily: "system-ui" }}>
+                Your agents
+              </p>
+              <button
+                onClick={() => void browseAgents()}
+                disabled={pickLoading}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#0891b2", fontSize: 11, fontFamily: "system-ui", padding: 0, textDecoration: "underline" }}
+              >
+                {pickLoading ? "Loading…" : agents.length ? "Refresh" : "Browse"}
+              </button>
+            </div>
+
           {/* Search box */}
+          {agents.length > 0 || pickLoading ? (
           <div className="flex gap-1">
             <input
               type="text"
@@ -201,11 +366,16 @@ function AgentBindingWidget({
               <i className="modus-icons" style={{ fontSize: 12, color: "var(--modus-wc-color-base-content)" }}>search</i>
             </button>
           </div>
+          ) : (
+            <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>
+              Optional: browse agents you have access to.
+            </p>
+          )}
 
           {/* Agent list */}
           {pickLoading && <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>Loading…</p>}
-          {!pickLoading && agents.length === 0 && (
-            <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>No agents found. Try searching, or paste an agent ID below.</p>
+          {!pickLoading && agents.length === 0 && searchTerm.trim() && (
+            <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>No agents found for that search.</p>
           )}
           <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
             {agents.map((a) => (
@@ -228,31 +398,6 @@ function AgentBindingWidget({
               </button>
             ))}
           </div>
-
-          {/* Paste ID directly */}
-          <div className="flex flex-col gap-1 pt-1 border-t border-[var(--modus-wc-color-base-300)]">
-            <p className="m-0 text-xs text-[var(--modus-wc-color-base-content-low-contrast)]" style={{ fontFamily: "system-ui" }}>Or paste an agent ID directly:</p>
-            <input
-              type="text"
-              value={pasteId}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              onChange={(e) => setPasteId(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") void bindById(); }}
-              style={{
-                padding: "4px 8px", borderRadius: 6, fontSize: 10, width: "100%", boxSizing: "border-box" as const,
-                border: "1px solid var(--modus-wc-color-base-300)",
-                background: "var(--modus-wc-color-base-100)",
-                color: "var(--modus-wc-color-base-content)",
-                fontFamily: "monospace", outline: "none",
-              }}
-            />
-            <button
-              onClick={() => void bindById()}
-              disabled={!pasteId.trim() || pasteLoading}
-              style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #0891b2", background: "rgba(8,145,178,0.1)", cursor: "pointer", color: "#0891b2", fontSize: 11, fontFamily: "system-ui", fontWeight: 600, alignSelf: "flex-start" }}
-            >
-              {pasteLoading ? "Looking up…" : "Bind this ID"}
-            </button>
           </div>
         </div>
       )}
@@ -260,6 +405,8 @@ function AgentBindingWidget({
       {/* Error */}
       {error && (
         <p className="m-0 text-xs" style={{ color: "var(--modus-wc-color-danger)", fontFamily: "system-ui" }}>{error}</p>
+      )}
+        </>
       )}
     </div>
   );
@@ -299,6 +446,7 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
   const { updateNodeConfig } = useCanvasStore();
   const d = node.data as Record<string, unknown>;
   const update = (key: string, value: unknown) => updateNodeConfig(node.id, { [key]: value });
+  const updateFields = (fields: Record<string, unknown>) => updateNodeConfig(node.id, fields);
 
   // Database entry local state
   const [newKey, setNewKey] = useState("");
@@ -470,8 +618,8 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
                   agentName={(d.agentName as string) ?? ""}
                   systemPrompt={(d.description as string) ?? ""}
                   nodeLabel={(d.label as string) ?? "AI Node"}
-                  onBound={(id, name) => { update("agentId", id); update("agentName", name); }}
-                  onUnbound={() => { update("agentId", ""); update("agentName", ""); }}
+                  onBound={(id, name) => updateFields({ agentId: id, agentName: name })}
+                  onUnbound={() => updateFields({ agentId: "", agentName: "" })}
                 />
               </div>
             </div>
@@ -668,8 +816,8 @@ export default function NodeConfigPanel({ node, onClose }: Props) {
                 agentName={(d.agentName as string) ?? ""}
                 systemPrompt={(d.description as string) ?? (d.label as string) ?? "Summarise and enrich the incoming data for downstream AI nodes."}
                 nodeLabel={(d.label as string) ?? "Connector"}
-                onBound={(id, name) => { update("agentId", id); update("agentName", name); }}
-                onUnbound={() => { update("agentId", ""); update("agentName", ""); }}
+                onBound={(id, name) => updateFields({ agentId: id, agentName: name })}
+                onUnbound={() => updateFields({ agentId: "", agentName: "" })}
               />
             </div>
           </>

@@ -107,7 +107,7 @@ export default function AppShell() {
 
       {/* ── Navbar ──────────────────────────────────────── */}
       <ModusWcNavbar
-        visibility={{ mainMenu: true, user: true, apps: false, notifications: false, search: false, help: false, ai: false, searchInput: false }}
+        visibility={{ mainMenu: true, user: false, apps: false, notifications: false, search: false, help: false, ai: false, searchInput: false }}
         customClass="flex-shrink-0"
       >
         <div slot="start" className="flex items-center gap-2 pl-2">

@@ -1,3 +1,4 @@
+import { getStoredToken } from "@/auth/tid";
 import type { AgentRunRequest, AgentRunResult } from "@/types/agent";
 import { useAppStore } from "@/store/appStore";
 
@@ -99,19 +100,29 @@ export async function liveAgentRun(
 ): Promise<AgentRunResult> {
   const base = apiBase();
   const path = `${base}/api/agents/${encodeURIComponent(agentId)}/runs`;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const userToken = getStoredToken();
+  if (userToken) headers["Authorization"] = `Bearer ${userToken}`;
   try {
     const res = await fetch(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
       credentials: "include",
     });
     const text = await res.text();
     if (!res.ok) {
+      let errorMessage = text || `${res.status} ${res.statusText}`;
+      try {
+        const parsed = JSON.parse(text) as { errorMessage?: string; error?: string };
+        errorMessage = parsed.errorMessage ?? parsed.error ?? errorMessage;
+      } catch {
+        /* keep raw text */
+      }
       return {
         status: "error",
         result: "",
-        errorMessage: text || `${res.status} ${res.statusText}`,
+        errorMessage,
       };
     }
     try {
@@ -139,5 +150,6 @@ export function useLiveAgents(): boolean {
   const flag = import.meta.env.VITE_LIVE_AGENTS;
   if (flag === "false") return false;
   if (flag === "true") return true;
+  if (getStoredToken()) return true;
   return useAppStore.getState().bffAgentConfigured === true;
 }

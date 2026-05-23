@@ -10,8 +10,13 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 import type { AgentRunRequest, AgentRunResult } from "@/types/agent";
+import { getStoredToken, openTidLogin } from "@/auth/tid";
 import { assembleInputContext, routeAgentOutputs } from "@/utils/workflowContext";
 import { liveAgentRun, simulateAgentRun, useLiveAgents } from "@/utils/agentRun";
+
+async function ensureToken(): Promise<void> {
+  if (!getStoredToken()) await openTidLogin();
+}
 
 export type CanvasMode = "plan" | "execute";
 export type ExecState = "idle" | "queued" | "running" | "done" | "error";
@@ -401,7 +406,37 @@ async function runAiNode(
   patchNodes([n.id], { status: "running" });
 
   let agentResult: AgentRunResult;
-  if (useLiveAgents() && agentId) {
+  const shouldRunLive = Boolean(agentId) || useLiveAgents();
+  if (shouldRunLive) {
+    if (!agentId) {
+      const msg = "Bind a Trimble agent first (Configure → Bind existing agent), then run again.";
+      patchNodes([n.id], {
+        executionState: "error" as ExecState,
+        status: "error",
+        _result: msg,
+      });
+      return { status: "error", result: "", errorMessage: msg };
+    }
+    try {
+      await ensureToken();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      patchNodes([n.id], {
+        executionState: "error" as ExecState,
+        status: "error",
+        _result: msg,
+      });
+      return { status: "error", result: "", errorMessage: msg };
+    }
+    if (!getStoredToken()) {
+      const msg = "Session expired — sign in again in the AI node panel.";
+      patchNodes([n.id], {
+        executionState: "error" as ExecState,
+        status: "error",
+        _result: msg,
+      });
+      return { status: "error", result: "", errorMessage: msg };
+    }
     const body: AgentRunRequest = {
       nodeId: n.id,
       workflowId: wfId,
