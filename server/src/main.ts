@@ -142,7 +142,10 @@ async function bootstrap() {
   app.setGlobalPrefix("api", {
     exclude: [
       { path: "mcp", method: RequestMethod.POST },
+      { path: "mcp", method: RequestMethod.GET },
+      { path: "mcp", method: RequestMethod.DELETE },
       { path: "canvas/:workflowId", method: RequestMethod.GET },
+      { path: "status/ready", method: RequestMethod.GET },
     ],
   });
 
@@ -163,12 +166,15 @@ async function bootstrap() {
     corsOrigins.push(stripSlash(process.env.CORS_EXTRA_ORIGIN));
   }
   corsOrigins.push(/\.azurestaticapps\.net$/);
+  corsOrigins.push(/\.azurecontainerapps\.io$/);
   corsOrigins.push(/\.amplifyapp\.com$/);
   corsOrigins.push(/\.elasticbeanstalk\.com$/);
 
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "Mcp-Session-Id", "mcp-session-id"],
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   });
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port);

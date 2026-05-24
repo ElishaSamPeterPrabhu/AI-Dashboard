@@ -1,0 +1,36 @@
+# Trimble Agentic Azure Container Apps deploy (org workflow on push to main).
+# Replaces the auth-only MCP template with the full NestJS BFF so Amplify canvas works.
+#
+# After deploy, set Amplify VITE_API_BASE to the container ingress URL (same as BFF_PUBLIC_URL).
+
+mcps:
+  - name: ai-dashboard-mcp
+    description: "AI Dashboard workflow canvas BFF + MCP tools"
+    author: "AI Dashboard"
+    # Single replica: MCP sessions + workflow store are in-memory (Assist 400s if load-balanced).
+    minReplicas: 1
+    maxReplicas: 1
+    dockerFile: server/Dockerfile
+    envVars:
+      - name: NODE_ENV
+        value: production
+      - name: PORT
+        value: "8080"
+      - name: TRIMBLE_AGENT_BASE_URL
+        value: https://agents.ai.trimble.com
+      # Set to the Container App ingress URL after first deploy (no trailing slash):
+      - name: BFF_PUBLIC_URL
+        value: https://ca-eus-tmp-ai-dashboard-mcp.victorioussmoke-3ce457d0.eastus2.azurecontainerapps.io
+      # Amplify UI URL (MCP App iframe + CORS):
+      - name: UI_PUBLIC_URL
+        value: https://feature-mcp-apps-canvas.d144x4qv8kv4uy.amplifyapp.com
+      - name: DEMO_PLANNER_AGENT_ID
+        value: df7b36b9-328a-41a5-8cd8-73d80c37ac46
+    secrets:
+      - name: CLIENT_ID
+        githubSecretRef: CLIENT_ID
+      - name: CLIENT_SECRET
+        githubSecretRef: CLIENT_SECRET
+      # Optional manual override; otherwise CLIENT_ID/SECRET fetch a machine token at boot:
+      - name: TRIMBLE_AGENT_API_KEY
+        githubSecretRef: TRIMBLE_AGENT_API_KEY

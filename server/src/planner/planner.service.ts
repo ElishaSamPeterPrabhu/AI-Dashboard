@@ -269,6 +269,7 @@ export class PlannerService {
         (n) => n.type === "connector" && edges.some((e) => e.target === n.id)
       );
 
+      // nonAi → aiNodes → connectorNodes → outputNodes (output must be last so AI _result is set)
       for (const n of nonAi) {
         if (n.type === "calculator") {
           const d = (nodes.find((x) => x.id === n.id) ?? n).data ?? {};
@@ -334,7 +335,7 @@ export class PlannerService {
           });
         } else {
           // If agent produced no text but ran tool calls, use the last script result as summary
-          const aiText = run.result?.trim()
+          const aiTextRaw = run.result?.trim()
             || (run.toolCalls?.length
               ? (() => {
                   const last = run.toolCalls[run.toolCalls.length - 1];
@@ -344,6 +345,9 @@ export class PlannerService {
                   return "";
                 })()
               : "");
+          // Never store empty string — output nodes treat "" same as null ("Awaiting value")
+          const curNode = nodes.find((x) => x.id === n.id) ?? n;
+          const aiText = aiTextRaw || (curNode.data?.label as string) || "Agent completed.";
           nodes = patchNodesData(nodes, [n.id], {
             executionState: "done",
             status: "idle",

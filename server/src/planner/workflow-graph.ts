@@ -163,6 +163,10 @@ export function resolveOutputValue(
     if (!src || src.type !== "ai") continue;
     const v = valueForContextFromNode(src);
     if (v != null && v !== "") return String(v);
+    // AI node ran but produced no text — surface its label so output isn't "Awaiting value"
+    if (src.data?.executionState === "done") {
+      return (src.data?.label as string) || "Agent completed.";
+    }
   }
 
   if (incoming.length === 1) {
