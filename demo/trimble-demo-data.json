@@ -17,7 +17,7 @@
             "frontendHours": "200",
             "backendHours": "300",
             "testingHours": "100",
-            "projectBudget": "72000",
+            "projectBudget": "41400",
             "teamSize": "6",
             "hourlyRate": "75",
             "sprintCount": "4",
@@ -39,7 +39,7 @@
             "inspectionHours": "300",
             "projectBudget": "2400000",
             "teamSize": "18",
-            "hourlyRate": "95",
+            "hourlyRate": "750",
             "phaseCount": "3",
             "riskBufferPct": "12"
           }
@@ -109,11 +109,11 @@
           "label": "India engineering rate card 2026",
           "fields": {
             "currency": "INR",
-            "engineerDailyRate": "45000",
-            "seniorEngineerDailyRate": "62000",
-            "pmDailyRate": "75000",
-            "qaEngDailyRate": "38000",
-            "designerDailyRate": "42000",
+            "engineerDailyRate": "25000",
+            "seniorEngineerDailyRate": "36000",
+            "pmDailyRate": "45000",
+            "qaEngDailyRate": "18500",
+            "designerDailyRate": "21000",
             "overheadPct": "15",
             "marginPct": "20"
           }
