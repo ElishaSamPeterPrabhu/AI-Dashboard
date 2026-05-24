@@ -66,6 +66,7 @@ Add for non-trivial graphs — readable and presentation-friendly.
 ```
 
 **Frame tip:** One `group` per lane (`frontendFrame`, `backendFrame`, `summaryFrame`). Stickies: no edges.
+**Frame label must be ≤2 words** (e.g. `"Inputs"`, `"Calculations"`, `"Summary"`) — it renders as visible text on the canvas. Never use full sentences as frame labels.
 
 ### Flow nodes (optional — branching / named steps)
 
